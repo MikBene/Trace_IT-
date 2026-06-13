@@ -1,1 +1,1 @@
-web: gunicorn Wildlife_Tracking_System.wsgi:application
+echo web: gunicorn Wildlife_Tracking_System.wsgi:application > Procfile
