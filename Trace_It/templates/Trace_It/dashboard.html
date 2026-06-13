@@ -1,0 +1,548 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}Dashboard - TRACE IT{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Dashboard Stats Cards */
+    .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 30px 25px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        cursor: pointer;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--card-color), transparent);
+        opacity: 0.7;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 60px var(--card-glow);
+        border-color: var(--card-color);
+    }
+
+    .stat-card .stat-icon {
+        font-size: 40px;
+        margin-bottom: 15px;
+        display: block;
+        animation: iconBounce 2s ease-in-out infinite;
+    }
+
+    @keyframes iconBounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+    }
+
+    .stat-card .stat-number {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 42px;
+        font-weight: 900;
+        margin-bottom: 5px;
+        background: linear-gradient(135deg, var(--card-color), #fff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .stat-card .stat-label {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 13px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: 500;
+    }
+
+    .stat-card-green {
+        --card-color: #198754;
+        --card-glow: rgba(25, 135, 84, 0.3);
+    }
+
+    .stat-card-blue {
+        --card-color: #0dcaf0;
+        --card-glow: rgba(13, 202, 240, 0.3);
+    }
+
+    .stat-card-yellow {
+        --card-color: #ffc107;
+        --card-glow: rgba(255, 193, 7, 0.3);
+    }
+
+    .stat-card-red {
+        --card-color: #dc3545;
+        --card-glow: rgba(220, 53, 69, 0.3);
+    }
+
+    .stat-card-purple {
+        --card-color: #6f42c1;
+        --card-glow: rgba(111, 66, 193, 0.3);
+    }
+
+    .stat-card-orange {
+        --card-color: #fd7e14;
+        --card-glow: rgba(253, 126, 20, 0.3);
+    }
+
+    /* Section Cards */
+    .section-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        overflow: hidden;
+        transition: all 0.4s;
+    }
+
+    .section-card:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    .section-header {
+        padding: 20px 25px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .section-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        opacity: 0.15;
+    }
+
+    .section-header-green::before {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+    }
+
+    .section-header-red::before {
+        background: linear-gradient(135deg, #dc3545, #fd7e14);
+    }
+
+    .section-header-purple::before {
+        background: linear-gradient(135deg, #6f42c1, #d63384);
+    }
+
+    .section-header h5 {
+        position: relative;
+        z-index: 1;
+        color: white;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 16px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin: 0;
+    }
+
+    .section-body {
+        padding: 25px;
+    }
+
+    /* List Items */
+    .dash-list-item {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s;
+    }
+
+    .dash-list-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.15);
+        transform: translateX(5px);
+    }
+
+    .dash-list-item:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Badges */
+    .dash-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    .dash-badge-critical {
+        background: linear-gradient(135deg, #dc3545, #bb2d3b);
+        color: white;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+    }
+
+    .dash-badge-high {
+        background: linear-gradient(135deg, #fd7e14, #e8590c);
+        color: white;
+        box-shadow: 0 4px 15px rgba(253, 126, 20, 0.4);
+    }
+
+    .dash-badge-medium {
+        background: linear-gradient(135deg, #ffc107, #e6a200);
+        color: #000;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+    }
+
+    .dash-badge-low {
+        background: linear-gradient(135deg, #0dcaf0, #0aa2c0);
+        color: white;
+        box-shadow: 0 4px 15px rgba(13, 202, 240, 0.4);
+    }
+
+    /* Alert Banner */
+    .alert-banner {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px 25px;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .alert-banner-admin {
+        border-left: 4px solid #0dcaf0;
+    }
+
+    .alert-banner-ranger {
+        border-left: 4px solid #198754;
+    }
+
+    .mode-text {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+    }
+
+    .mode-text strong {
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 2px;
+    }
+
+    /* Export Buttons */
+    .btn-export {
+        padding: 10px 25px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        border: 1px solid;
+        background: transparent;
+        transition: all 0.4s;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-export-green {
+        border-color: rgba(25, 135, 84, 0.5);
+        color: #198754;
+    }
+
+    .btn-export-green:hover {
+        background: rgba(25, 135, 84, 0.2);
+        border-color: #198754;
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
+        color: #198754;
+    }
+
+    .btn-export-red {
+        border-color: rgba(220, 53, 69, 0.5);
+        color: #dc3545;
+    }
+
+    .btn-export-red:hover {
+        background: rgba(220, 53, 69, 0.2);
+        border-color: #dc3545;
+        box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+        color: #dc3545;
+    }
+
+    /* Warning Alert */
+    .warning-alert {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(253, 126, 20, 0.15));
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        border-radius: 16px;
+        padding: 20px 25px;
+        margin-top: 30px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        animation: warningPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes warningPulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(220, 53, 69, 0.1); }
+        50% { box-shadow: 0 0 40px rgba(220, 53, 69, 0.3); }
+    }
+
+    .warning-icon {
+        font-size: 30px;
+        animation: warningShake 1s ease-in-out infinite;
+    }
+
+    @keyframes warningShake {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-10deg); }
+        75% { transform: rotate(10deg); }
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .empty-state-icon {
+        font-size: 50px;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+
+    /* Animations */
+    .fade-in-up {
+        animation: fadeInUp 0.6s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes fadeInUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+
+    /* Biometric mini stat */
+    .bio-stat {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: rgba(255,255,255,0.6);
+    }
+    .bio-stat i {
+        font-size: 14px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Mode Banner -->
+{% if user.userprofile.is_admin %}
+<div class="alert-banner alert-banner-admin fade-in-up">
+    <div class="mode-text">
+        <strong style="color: #0dcaf0;">ADMIN MODE</strong> — You have full system access.
+    </div>
+    <div>
+        <a href="{% url 'export_locations' %}" class="btn-export btn-export-green me-2">📊 Export Locations</a>
+        <a href="{% url 'export_alerts' %}" class="btn-export btn-export-red">🚨 Export Alerts</a>
+    </div>
+</div>
+{% else %}
+<div class="alert-banner alert-banner-ranger fade-in-up">
+    <div class="mode-text">
+        <strong style="color: #198754;">RANGER MODE</strong> — View-only access. Contact admin for changes.
+    </div>
+</div>
+{% endif %}
+
+<!-- Title -->
+<h2 class="mb-4 fade-in-up delay-1" style="font-family: 'Orbitron', sans-serif; letter-spacing: 4px;">Dashboard</h2>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-green fade-in-up delay-1">
+            <span class="stat-icon">🦁</span>
+            <div class="stat-number">{{ total_animals }}</div>
+            <div class="stat-label">Total Animals</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-blue fade-in-up delay-2">
+            <span class="stat-icon">📡</span>
+            <div class="stat-number">{{ active_deployments }}</div>
+            <div class="stat-label">Active Deployments</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-yellow fade-in-up delay-3">
+            <span class="stat-icon">📍</span>
+            <div class="stat-number">{{ total_locations }}</div>
+            <div class="stat-label">Total Locations</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-card-red fade-in-up delay-4">
+            <span class="stat-icon">⚠️</span>
+            <div class="stat-number">{{ unresolved_alerts }}</div>
+            <div class="stat-label">Unresolved Alerts</div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW: Biometric Stats Row -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="stat-card stat-card-purple fade-in-up delay-1">
+            <span class="stat-icon">❤️</span>
+            <div class="stat-number">{{ critical_health_alerts }}</div>
+            <div class="stat-label">Critical Health Alerts</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card stat-card-orange fade-in-up delay-2">
+            <span class="stat-icon">🔌</span>
+            <div class="stat-number">{{ sensor_errors }}</div>
+            <div class="stat-label">Sensor Errors</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card stat-card-blue fade-in-up delay-3">
+            <span class="stat-icon">📊</span>
+            <div class="stat-number">{{ recent_biometrics|length }}</div>
+            <div class="stat-label">Biometric Readings</div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Sections -->
+<div class="row">
+    <!-- Recent Locations -->
+    <div class="col-md-4 mb-4">
+        <div class="section-card fade-in-up delay-2">
+            <div class="section-header section-header-green">
+                <h5>📡 Recent Locations</h5>
+            </div>
+            <div class="section-body">
+                {% if recent_locations %}
+                    {% for loc in recent_locations %}
+                        <div class="dash-list-item">
+                            <span style="color: rgba(255,255,255,0.8);">
+                                <strong>{{ loc.tag.tag_serial_number }}</strong>
+                            </span>
+                            <span style="color: rgba(255,255,255,0.4); font-size: 12px;">
+                                {{ loc.timestamp }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📡</div>
+                        <p>No recent locations recorded.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="col-md-4 mb-4">
+        <div class="section-card fade-in-up delay-3">
+            <div class="section-header section-header-red">
+                <h5>🚨 Recent Alerts</h5>
+            </div>
+            <div class="section-body">
+                {% if recent_alerts %}
+                    {% for alert in recent_alerts %}
+                        <div class="dash-list-item">
+                            <span style="color: rgba(255,255,255,0.8);">
+                                {{ alert.alert_type }} — <strong>{{ alert.animal.nickname }}</strong>
+                            </span>
+                            <span class="dash-badge dash-badge-{% if alert.severity == 'CRITICAL' %}critical{% elif alert.severity == 'HIGH' %}high{% elif alert.severity == 'MEDIUM' %}medium{% else %}low{% endif %}">
+                                {{ alert.severity }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✅</div>
+                        <p>No active alerts. All clear!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Recent Biometrics -->
+    <div class="col-md-4 mb-4">
+        <div class="section-card fade-in-up delay-4">
+            <div class="section-header section-header-purple">
+                <h5>❤️ Recent Biometrics</h5>
+            </div>
+            <div class="section-body">
+                {% if recent_biometrics %}
+                    {% for bio in recent_biometrics %}
+                        <div class="dash-list-item">
+                            <span style="color: rgba(255,255,255,0.8);">
+                                <strong>{{ bio.tag.tag_serial_number }}</strong>
+                            </span>
+                            <span class="bio-stat">
+                                {% if bio.heart_rate_bpm %}
+                                    <i class="bi bi-heart-pulse text-danger"></i> {{ bio.heart_rate_bpm }}
+                                {% endif %}
+                                {% if bio.spo2_percent %}
+                                    <i class="bi bi-droplet text-info"></i> {{ bio.spo2_percent|floatformat:0 }}%
+                                {% endif %}
+                                {% if bio.sensor_status != 'OK' %}
+                                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                                {% endif %}
+                            </span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❤️</div>
+                        <p>No biometric data yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Low Battery Warning -->
+{% if low_battery_tags > 0 %}
+<div class="warning-alert fade-in-up delay-4">
+    <span class="warning-icon">🔋</span>
+    <div>
+        <strong style="color: #ff6b6b;">Warning!</strong>
+        <span style="color: rgba(255,255,255,0.8);">{{ low_battery_tags }} tag(s) have critically low battery levels. Replace or recharge immediately.</span>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,313 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}{{ animal.nickname }} - Details - TRACE IT{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <!-- Animal Info Card -->
+        <div class="card shadow card-animated">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">{{ animal.nickname }}</h4>
+            </div>
+            <div class="card-body text-center">
+                {% if animal.photo %}
+                    <img src="{{ animal.photo.url }}" class="img-fluid rounded mb-3" style="max-height: 200px;">
+                {% else %}
+                    <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3" style="height: 200px;">
+                        <span class="text-muted">No Photo</span>
+                    </div>
+                {% endif %}
+                <h5>{{ animal.species.common_name }}</h5>
+                <p class="text-muted"><em>{{ animal.species.scientific_name }}</em></p>
+                <hr>
+                <p><strong>Gender:</strong> {{ animal.gender }}</p>
+                <p><strong>Birth Year:</strong> {{ animal.birth_year|default:"Unknown" }}</p>
+                <p><strong>Weight:</strong> {{ animal.weight|default:"Unknown" }} kg</p>
+                <p><strong>Health:</strong> {{ animal.health_status }}</p>
+                <p><strong>Last Seen:</strong> {{ animal.last_seen|default:"Never" }}</p>
+                {% if animal.is_stationary %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Stationary for 90+ minutes!</strong>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tracking Tag Card -->
+        {% if tag %}
+        <div class="card shadow mt-3 card-animated">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Tracking Tag</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Serial:</strong> {{ tag.tag_serial_number }}</p>
+                <p><strong>Battery:</strong> 
+                    <span class="badge bg-{% if tag.battery_level > 50 %}success{% elif tag.battery_level > 20 %}warning{% else %}danger{% endif %} badge-animated">
+                        {{ tag.battery_level }}%
+                    </span>
+                </p>
+                <p><strong>Manufacturer:</strong> {{ tag.manufacturer|default:"N/A" }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- LIVE BIOMETRICS CARD -->
+        <div class="card shadow mt-3 card-animated">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> Live Vitals</h5>
+                <span class="badge bg-light text-danger" id="vitals-status">Live</span>
+            </div>
+            <div class="card-body">
+                {% if latest_biometrics %}
+                    <div class="row text-center mb-3">
+                        <div class="col-4">
+                            <div class="display-6 fw-bold {% if latest_biometrics.heart_rate_bpm and latest_biometrics.heart_rate_bpm < 30 or latest_biometrics.heart_rate_bpm > 150 %}text-danger{% else %}text-success{% endif %}" id="hr-display">
+                                {{ latest_biometrics.heart_rate_bpm|default:"--" }}
+                            </div>
+                            <small class="text-muted">BPM</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="display-6 fw-bold text-info" id="spo2-display">
+                                {% if latest_biometrics.spo2_percent %}
+                                    {{ latest_biometrics.spo2_percent|floatformat:0 }}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">SpO2%</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="display-6 fw-bold {% if latest_biometrics.body_temperature_c and latest_biometrics.body_temperature_c > 40 or latest_biometrics.body_temperature_c < 35 %}text-danger{% else %}text-warning{% endif %}" id="temp-display">
+                                {% if latest_biometrics.body_temperature_c %}
+                                    {{ latest_biometrics.body_temperature_c|floatformat:1 }}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">°C</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Accelerometer -->
+                    <div class="bg-light rounded p-2 text-center mb-2">
+                        <small class="text-muted"><i class="bi bi-activity"></i> Accelerometer</small>
+                        <div class="font-monospace small" id="accel-display">
+                            X:{{ latest_biometrics.accel_x|default:"-" }} 
+                            Y:{{ latest_biometrics.accel_y|default:"-" }} 
+                            Z:{{ latest_biometrics.accel_z|default:"-" }}
+                        </div>
+                    </div>
+
+                    <!-- Sensor Status -->
+                    {% if latest_biometrics.sensor_status != 'OK' %}
+                        <div class="alert alert-warning py-2 mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> 
+                            <strong>Sensor:</strong> {{ latest_biometrics.sensor_status }}
+                        </div>
+                    {% endif %}
+                    
+                    <small class="text-muted d-block mt-2 text-center">
+                        <i class="bi bi-clock"></i> Last update: {{ latest_biometrics.timestamp|timesince }} ago
+                    </small>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-heart-pulse display-4 text-muted"></i>
+                        <p class="text-muted mt-2">No biometric data available.</p>
+                        <small class="text-muted">Waiting for IoT device connection...</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <!-- Location History Card -->
+        <div class="card shadow mb-4 card-animated">
+            <div class="card-header bg-success text-white d-flex justify-content-between">
+                <h5 class="mb-0">Location History</h5>
+                <div>
+                    <a href="{% url 'location_history' animal.animal_id %}" class="btn btn-sm btn-light btn-animated">View All</a>
+                    <button onclick="getWeather({{ animal.animal_id }})" class="btn btn-sm btn-info btn-animated">Weather</button>
+                    <button onclick="predictNext({{ animal.animal_id }})" class="btn btn-sm btn-warning btn-animated">Predict</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="weather-info" class="alert alert-info d-none"></div>
+                <div id="prediction-info" class="alert alert-warning d-none"></div>
+                {% if locations %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Speed</th>
+                                    <th>Temp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loc in locations|slice:":10" %}
+                                <tr class="table-row-animated">
+                                    <td>{{ loc.timestamp }}</td>
+                                    <td>{{ loc.latitude }}</td>
+                                    <td>{{ loc.longitude }}</td>
+                                    <td>{{ loc.speed|default:"-" }} km/h</td>
+                                    <td>{{ loc.temperature|default:"-" }}°C</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No location history available.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- BIOMETRIC HISTORY CHART -->
+        <div class="card shadow mb-4 card-animated">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Vitals History</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="vitalsChart" height="120"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Alerts Card -->
+        <div class="card shadow card-animated">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">Recent Alerts</h5>
+            </div>
+            <div class="card-body">
+                {% if alerts %}
+                    {% for alert in alerts %}
+                        <div class="alert alert-{% if alert.severity == 'CRITICAL' %}danger{% elif alert.severity == 'HIGH' %}danger{% elif alert.severity == 'MEDIUM' %}warning{% else %}info{% endif %}">
+                            <strong>{{ alert.alert_type }}</strong> - {{ alert.severity }}
+                            <p class="mb-0">{{ alert.message }}</p>
+                            <small class="text-muted">{{ alert.timestamp }}</small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No alerts for this animal.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Weather fetch
+function getWeather(animalId) {
+    fetch('/api/weather/' + animalId + '/')
+        .then(response => response.json())
+        .then(data => {
+            var info = document.getElementById('weather-info');
+            if (data.error) {
+                info.innerHTML = 'Weather data unavailable: ' + data.error;
+            } else {
+                info.innerHTML = '<strong>Current Weather:</strong> ' + data.description + 
+                    ', ' + data.temperature + '°C, Humidity: ' + data.humidity + 
+                    '%, Wind: ' + data.wind_speed + ' m/s';
+            }
+            info.classList.remove('d-none');
+        });
+}
+
+// Prediction fetch
+function predictNext(animalId) {
+    fetch('/api/predict/' + animalId + '/')
+        .then(response => response.json())
+        .then(data => {
+            var info = document.getElementById('prediction-info');
+            if (data.error) {
+                info.innerHTML = 'Prediction unavailable: ' + data.error;
+            } else {
+                info.innerHTML = '<strong>Predicted Next Location:</strong> Lat ' + 
+                    data.predicted_latitude.toFixed(6) + ', Lon ' + 
+                    data.predicted_longitude.toFixed(6);
+            }
+            info.classList.remove('d-none');
+        });
+}
+
+// Live vitals SSE stream
+const evtSource = new EventSource("/api/vitals-stream/{{ animal.animal_id }}/");
+evtSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    
+    if (data.hr !== null && data.hr !== undefined) {
+        document.getElementById('hr-display').innerText = data.hr;
+        if (data.hr < 30 || data.hr > 150) {
+            document.getElementById('hr-display').className = 'display-6 fw-bold text-danger';
+        } else {
+            document.getElementById('hr-display').className = 'display-6 fw-bold text-success';
+        }
+    }
+    
+    if (data.spo2 !== null && data.spo2 !== undefined) {
+        document.getElementById('spo2-display').innerText = Math.round(data.spo2);
+    }
+    
+    if (data.temp !== null && data.temp !== undefined) {
+        document.getElementById('temp-display').innerText = data.temp.toFixed(1);
+        if (data.temp > 40 || data.temp < 35) {
+            document.getElementById('temp-display').className = 'display-6 fw-bold text-danger';
+        } else {
+            document.getElementById('temp-display').className = 'display-6 fw-bold text-warning';
+        }
+    }
+    
+    if (data.accel_x !== undefined) {
+        document.getElementById('accel-display').innerText = 
+            'X:' + data.accel_x + ' Y:' + data.accel_y + ' Z:' + data.accel_z;
+    }
+};
+
+// Vitals History Chart
+{% if biometric_history %}
+const ctx = document.getElementById('vitalsChart').getContext('2d');
+const vitalsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [{% for b in biometric_history reversed %}'{{ b.timestamp|date:"H:i" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Heart Rate (BPM)',
+            data: [{% for b in biometric_history reversed %}{{ b.heart_rate_bpm|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            borderColor: '#dc3545',
+            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+            tension: 0.4,
+            fill: true
+        }, {
+            label: 'SpO2 (%)',
+            data: [{% for b in biometric_history reversed %}{{ b.spo2_percent|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            borderColor: '#0dcaf0',
+            backgroundColor: 'rgba(13, 202, 240, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y1'
+        }, {
+            label: 'Temp (°C)',
+            data: [{% for b in biometric_history reversed %}{{ b.body_temperature_c|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            borderColor: '#ffc107',
+            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            y: { beginAtZero: false, title: { display: true, text: 'HR (BPM)' } },
+            y1: { position: 'right', beginAtZero: false, title: { display: true, text: 'SpO2% / °C' } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}{{ animal.nickname }} - Location History - TRACE IT{% endblock %}
+
+{% block content %}
+<h2>Location History: {{ animal.nickname }}</h2>
+
+<div class="card shadow card-animated">
+    <div class="card-body">
+        {% if locations %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-success">
+                        <tr>
+                            <th>#</th>
+                            <th>Timestamp</th>
+                            <th>Latitude</th>
+                            <th>Longitude</th>
+                            <th>Altitude</th>
+                            <th>Speed</th>
+                            <th>Temperature</th>
+                            <th>Accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loc in locations %}
+                        <tr class="table-row-animated">
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ loc.timestamp }}</td>
+                            <td>{{ loc.latitude }}</td>
+                            <td>{{ loc.longitude }}</td>
+                            <td>{{ loc.altitude|default:"-" }} m</td>
+                            <td>{{ loc.speed|default:"-" }} km/h</td>
+                            <td>{{ loc.temperature|default:"-" }}°C</td>
+                            <td>{{ loc.accuracy_meters|default:"-" }} m</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted">No location history available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<a href="{% url 'animal_detail' animal.animal_id %}" class="btn btn-success mt-3 btn-animated">Back to Animal</a>
+{% endblock %}

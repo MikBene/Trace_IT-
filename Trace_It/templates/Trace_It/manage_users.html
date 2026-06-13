@@ -1,0 +1,68 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}Manage Users - TRACE IT{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Manage Users</h2>
+
+<div class="d-flex justify-content-between mb-3">
+    <h4>All Users</h4>
+    <a href="{% url 'create_ranger' %}" class="btn btn-success btn-animated">+ Create New Ranger</a>
+</div>
+
+<div class="card shadow card-animated">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for profile in users %}
+                    <tr class="table-row-animated">
+                        <td>{{ profile.user.username }}</td>
+                        <td>
+                            <span class="badge bg-{% if profile.role == 'ADMIN' %}danger{% else %}success{% endif %} badge-animated">
+                                {{ profile.role }}
+                            </span>
+                        </td>
+                        <td>{{ profile.user.first_name }} {{ profile.user.last_name }}</td>
+                        <td>{{ profile.user.email }}</td>
+                        <td>{{ profile.phone|default:"-" }}</td>
+                        <td>
+                            {% if profile.user.is_active %}
+                                <span class="badge bg-success badge-animated">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary badge-animated">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if profile.role == 'RANGER' %}
+                                <form method="post" action="{% url 'toggle_user_status' profile.user.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    {% if profile.user.is_active %}
+                                        <button type="submit" class="btn btn-sm btn-warning btn-animated">Deactivate</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-sm btn-success btn-animated">Activate</button>
+                                    {% endif %}
+                                </form>
+                            {% else %}
+                                <span class="text-muted">Admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

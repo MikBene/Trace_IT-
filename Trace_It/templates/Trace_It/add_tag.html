@@ -1,0 +1,22 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}Add Tracking Tag - TRACE IT{% endblock %}
+
+{% block content %}
+<h2>Add New Tracking Tag</h2>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow card-animated">
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-success btn-animated">Save Tag</button>
+                    <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-animated">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

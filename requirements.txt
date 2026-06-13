@@ -1,0 +1,8 @@
+@'
+Django>=4.2,<5.0
+gunicorn
+whitenoise
+dj-database-url
+psycopg2-binary
+Pillow
+'@ | Set-Content requirements.txt -Encoding UTF8

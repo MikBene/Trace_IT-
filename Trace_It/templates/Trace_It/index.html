@@ -1,0 +1,607 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}Home - TRACE IT{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 35px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .page-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* Action Buttons */
+    .btn-action {
+        padding: 12px 25px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        transition: all 0.4s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid;
+        cursor: pointer;
+    }
+
+    .btn-action-green {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.2), rgba(20, 108, 67, 0.2));
+        border-color: rgba(25, 135, 84, 0.5);
+        color: #198754;
+    }
+
+    .btn-action-green:hover {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.4), rgba(20, 108, 67, 0.4));
+        border-color: #198754;
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
+        transform: translateY(-2px);
+        color: #198754;
+    }
+
+    .btn-action-outline {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .btn-action-outline:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.4);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    /* Animal Cards */
+    .animal-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        height: 100%;
+        position: relative;
+    }
+
+    .animal-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #198754, #0dcaf0);
+        opacity: 0.7;
+    }
+
+    .animal-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), 0 0 60px rgba(25, 135, 84, 0.15);
+        border-color: rgba(25, 135, 84, 0.3);
+    }
+
+    .animal-card-header {
+        padding: 20px 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.15), rgba(13, 202, 240, 0.1));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .animal-name {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: white;
+        margin: 0;
+        letter-spacing: 1px;
+    }
+
+    .species-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.3), rgba(13, 202, 240, 0.2));
+        color: #0dcaf0;
+        border: 1px solid rgba(13, 202, 240, 0.3);
+    }
+
+    .animal-card-body {
+        padding: 25px;
+    }
+
+    .animal-photo {
+        width: 100%;
+        height: 160px;
+        border-radius: 15px;
+        object-fit: cover;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.3s;
+    }
+
+    .animal-card:hover .animal-photo {
+        border-color: rgba(25, 135, 84, 0.4);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-placeholder {
+        width: 100%;
+        height: 160px;
+        border-radius: 15px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 50px;
+        transition: all 0.3s;
+    }
+
+    .animal-card:hover .photo-placeholder {
+        border-color: rgba(25, 135, 84, 0.3);
+    }
+
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-item:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    .info-value {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .status-badge {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    .status-healthy {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.3), rgba(20, 108, 67, 0.2));
+        color: #198754;
+        border: 1px solid rgba(25, 135, 84, 0.3);
+    }
+
+    .status-warning {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(230, 162, 0, 0.2));
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .battery-badge {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+
+    .battery-high {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.3), rgba(20, 108, 67, 0.2));
+        color: #198754;
+        border: 1px solid rgba(25, 135, 84, 0.3);
+        box-shadow: 0 4px 15px rgba(25, 135, 84, 0.2);
+    }
+
+    .battery-medium {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(230, 162, 0, 0.2));
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.2);
+    }
+
+    .battery-low {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.3), rgba(187, 45, 59, 0.2));
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2);
+        animation: batteryPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes batteryPulse {
+        0%, 100% { box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2); }
+        50% { box-shadow: 0 4px 25px rgba(220, 53, 69, 0.5); }
+    }
+
+    .location-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 10px;
+    }
+
+    .location-box .coord {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 13px;
+        color: #0dcaf0;
+        letter-spacing: 1px;
+    }
+
+    .location-box .time {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 5px;
+    }
+
+    .stationary-alert {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(230, 162, 0, 0.1));
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 15px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: warningPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes warningPulse {
+        0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.1); }
+        50% { box-shadow: 0 0 25px rgba(255, 193, 7, 0.3); }
+    }
+
+    .stationary-alert .alert-icon {
+        font-size: 24px;
+        animation: alertShake 1s ease-in-out infinite;
+    }
+
+    @keyframes alertShake {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-10deg); }
+        75% { transform: rotate(10deg); }
+    }
+
+    .stationary-alert .alert-text {
+        color: #ffc107;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .stationary-alert .alert-text strong {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 3px;
+    }
+
+    /* Vitals Mini Display on Card */
+    .vitals-mini {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .vital-pill {
+        background: rgba(220, 53, 69, 0.15);
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #ff6b6b;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .vital-pill.spo2 {
+        background: rgba(13, 202, 240, 0.15);
+        border-color: rgba(13, 202, 240, 0.3);
+        color: #0dcaf0;
+    }
+
+    .vital-pill.temp {
+        background: rgba(255, 193, 7, 0.15);
+        border-color: rgba(255, 193, 7, 0.3);
+        color: #ffc107;
+    }
+
+    .vital-pill.offline {
+        background: rgba(108, 117, 125, 0.15);
+        border-color: rgba(108, 117, 125, 0.3);
+        color: #6c757d;
+    }
+
+    .animal-card-footer {
+        padding: 20px 25px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn-card {
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid;
+        cursor: pointer;
+    }
+
+    .btn-card-primary {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.2), rgba(20, 108, 67, 0.2));
+        border-color: rgba(25, 135, 84, 0.5);
+        color: #198754;
+    }
+
+    .btn-card-primary:hover {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.4), rgba(20, 108, 67, 0.4));
+        border-color: #198754;
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
+        transform: translateY(-2px);
+        color: #198754;
+    }
+
+    .btn-card-outline {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .btn-card-outline:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.4);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 40px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+    }
+
+    .empty-state-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+        opacity: 0.3;
+        animation: emptyFloat 3s ease-in-out infinite;
+    }
+
+    @keyframes emptyFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+
+    .empty-state-text {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 18px;
+        letter-spacing: 2px;
+    }
+
+    .fade-in-up {
+        animation: fadeInUp 0.6s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes fadeInUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header fade-in-up">
+    <h1 class="page-title">
+        <i class="bi bi-geo-alt-fill me-2" style="color: #198754;"></i>
+        Tracked Animals
+    </h1>
+    {% if user.is_authenticated and user.userprofile.is_admin %}
+        <div>
+            <a href="{% url 'add_animal' %}" class="btn-action btn-action-green me-2">
+                <i class="bi bi-plus-lg"></i> Add Animal
+            </a>
+            <a href="{% url 'add_tag' %}" class="btn-action btn-action-outline">
+                <i class="bi bi-tag"></i> Add Tag
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Animal Cards Grid -->
+<div class="row">
+    {% for item in animal_data %}
+        <div class="col-md-6 mb-4 fade-in-up delay-{{ forloop.counter|divisibleby:4|yesno:"4,1,2,3" }}">
+            <div class="animal-card">
+                <!-- Card Header -->
+                <div class="animal-card-header">
+                    <h5 class="animal-name">{{ item.animal.nickname }}</h5>
+                    <span class="species-badge">{{ item.animal.species.common_name }}</span>
+                </div>
+
+                <!-- Card Body -->
+                <div class="animal-card-body">
+                    <div class="row">
+                        <!-- Photo Column -->
+                        <div class="col-md-4 text-center mb-3 mb-md-0">
+                            {% if item.animal.photo %}
+                                <img src="{{ item.animal.photo.url }}" class="animal-photo" alt="{{ item.animal.nickname }}">
+                            {% else %}
+                                <div class="photo-placeholder">
+                                    🦁
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Info Column -->
+                        <div class="col-md-8">
+                            <!-- Gender -->
+                            <div class="info-item">
+                                <span class="info-label">Gender</span>
+                                <span class="info-value">{{ item.animal.gender }}</span>
+                            </div>
+
+                            <!-- Health -->
+                            <div class="info-item">
+                                <span class="info-label">Health</span>
+                                <span class="status-badge {% if item.animal.health_status == 'Healthy' %}status-healthy{% else %}status-warning{% endif %}">
+                                    {{ item.animal.health_status }}
+                                </span>
+                            </div>
+
+                            <!-- Battery -->
+                            {% if item.battery_level %}
+                                <div class="info-item">
+                                    <span class="info-label">Tag Battery</span>
+                                    <span class="battery-badge {% if item.battery_level > 50 %}battery-high{% elif item.battery_level > 20 %}battery-medium{% else %}battery-low{% endif %}">
+                                        {{ item.battery_level }}%
+                                    </span>
+                                </div>
+                            {% endif %}
+
+                            <!-- LIVE BIOMETRICS MINI -->
+                            {% if item.latest_biometrics %}
+                                <div class="vitals-mini">
+                                    {% if item.latest_biometrics.heart_rate_bpm %}
+                                        <span class="vital-pill">
+                                            <i class="bi bi-heart-pulse"></i> {{ item.latest_biometrics.heart_rate_bpm }} BPM
+                                        </span>
+                                    {% endif %}
+                                    {% if item.latest_biometrics.spo2_percent %}
+                                        <span class="vital-pill spo2">
+                                            <i class="bi bi-droplet"></i> {{ item.latest_biometrics.spo2_percent|floatformat:0 }}%
+                                        </span>
+                                    {% endif %}
+                                    {% if item.latest_biometrics.body_temperature_c %}
+                                        <span class="vital-pill temp">
+                                            <i class="bi bi-thermometer"></i> {{ item.latest_biometrics.body_temperature_c|floatformat:1 }}°C
+                                        </span>
+                                    {% endif %}
+                                    {% if item.latest_biometrics.sensor_status != 'OK' %}
+                                        <span class="vital-pill offline">
+                                            <i class="bi bi-exclamation-triangle"></i> Sensor Error
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+
+                            <!-- Location -->
+                            {% if item.latest_location %}
+                                <div class="location-box">
+                                    <div class="coord">
+                                        <i class="bi bi-geo-alt me-1"></i>
+                                        {{ item.latest_location.latitude }}, {{ item.latest_location.longitude }}
+                                    </div>
+                                    <div class="time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        {{ item.latest_location.timestamp }}
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-2" style="font-size: 12px; color: rgba(255,255,255,0.4);">
+                                        <span><i class="bi bi-speedometer2 me-1"></i> {{ item.latest_location.speed|default:"N/A" }} km/h</span>
+                                        <span><i class="bi bi-thermometer me-1"></i> {{ item.latest_location.temperature|default:"N/A" }}°C</span>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="location-box" style="text-align: center;">
+                                    <span style="color: rgba(255,255,255,0.3); font-size: 13px;">
+                                        <i class="bi bi-geo-alt-slash me-1"></i> No location data
+                                    </span>
+                                </div>
+                            {% endif %}
+
+                            <!-- Stationary Alert -->
+                            {% if item.animal.is_stationary %}
+                                <div class="stationary-alert">
+                                    <span class="alert-icon">⚠️</span>
+                                    <div class="alert-text">
+                                        <strong>Stationary Alert!</strong>
+                                        Animal hasn't moved in 90+ minutes.
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Footer -->
+                <div class="animal-card-footer">
+                    <a href="{% url 'animal_detail' item.animal.animal_id %}" class="btn-card btn-card-primary">
+                        <i class="bi bi-eye"></i> View Details
+                    </a>
+                    {% if user.is_authenticated and user.userprofile.is_admin %}
+                        <a href="{% url 'edit_animal' item.animal.animal_id %}" class="btn-card btn-card-outline">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-12 fade-in-up">
+            <div class="empty-state">
+                <div class="empty-state-icon">🦁</div>
+                <p class="empty-state-text">No animals tracked yet. Add your first animal to get started.</p>
+                {% if user.is_authenticated and user.userprofile.is_admin %}
+                    <a href="{% url 'add_animal' %}" class="btn-action btn-action-green mt-3">
+                        <i class="bi bi-plus-lg"></i> Add First Animal
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
