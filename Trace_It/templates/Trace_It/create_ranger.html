@@ -270,6 +270,52 @@
     .btn-close-white {
         filter: invert(1) grayscale(100%) brightness(200%);
     }
+
+    /* ─── MOBILE FIX FOR SAVE BUTTON ─── */
+    @media (max-width: 768px) {
+        .modal-dialog {
+            margin: 10px;
+            max-width: 100%;
+        }
+        
+        .modal-body {
+            padding: 15px;
+        }
+        
+        button[type="submit"], 
+        .btn-animated {
+            min-height: 48px;
+            min-width: 100px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Ensure modal is above backdrop */
+        .modal {
+            z-index: 1050;
+        }
+        
+        .modal-backdrop {
+            z-index: 1040;
+        }
+        
+        /* Fix for iOS Safari */
+        .modal-content {
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Make action buttons bigger on mobile */
+        .btn-action {
+            padding: 12px 18px;
+            font-size: 14px;
+        }
+        
+        /* Ensure forms in modals are clickable */
+        .modal form {
+            position: relative;
+            z-index: 1;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -473,10 +519,10 @@
                                 {% endif %}
                             </td>
 
-                            <!-- Actions - Edit button is VISIBLE here -->
+                            <!-- Actions -->
                             <td>
                                 <div class="d-flex gap-2">
-                                    <!-- Edit Button - VISIBLE with text -->
+                                    <!-- Edit Button -->
                                     <button type="button" class="btn-action btn-edit" 
                                             data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}"
                                             title="Edit {{ user.email }}">
@@ -516,10 +562,10 @@
                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body p-4 ranger-form">
-                                        <form id="editForm{{ user.id }}" method="post" onsubmit="return submitEditForm(event, {{ user.id }})">
+                                        <form id="editForm{{ user.id }}" method="post" action="{% url 'manage_users' %}">
                                             {% csrf_token %}
-                                            <input type="hidden" name="user_id" value="{{ user.id }}">
                                             <input type="hidden" name="action" value="edit_ranger">
+                                            <input type="hidden" name="user_id" value="{{ user.id }}">
 
                                             <div class="row">
                                                 <!-- Email -->
@@ -591,36 +637,50 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
-<!-- JavaScript for handling edit form submission -->
+{% block extra_js %}
 <script>
-function submitEditForm(event, userId) {
-    event.preventDefault();
-
-    var form = document.getElementById('editForm' + userId);
-    var formData = new FormData(form);
-
-    // Submit to the current page (manage_users) which will handle the edit
-    fetch(window.location.pathname, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-    })
-    .then(response => {
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            alert('Error saving changes. Please try again.');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error saving changes. Please try again.');
+// Mobile touch fix for modal buttons
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix for iOS Safari not clicking buttons inside modals
+    document.querySelectorAll('.modal').forEach(function(modal) {
+        modal.addEventListener('touchstart', function(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                e.target.style.transform = 'scale(0.95)';
+            }
+        }, {passive: true});
+        
+        modal.addEventListener('touchend', function(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                e.target.style.transform = '';
+            }
+        }, {passive: true});
     });
-
-    return false;
-}
+    
+    // Ensure submit buttons are clickable and not blocked by modal
+    document.querySelectorAll('.modal button[type="submit"]').forEach(function(btn) {
+        btn.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+        }, {passive: true});
+        
+        // Prevent any parent elements from intercepting the click
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Let the form submit normally
+        });
+    });
+    
+    // Fix for Bootstrap modal backdrop blocking clicks on mobile
+    document.querySelectorAll('.modal').forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            document.body.style.overflow = 'hidden';
+        });
+        
+        modal.addEventListener('hidden.bs.modal', function() {
+            document.body.style.overflow = '';
+        });
+    });
+});
 </script>
 {% endblock %}
