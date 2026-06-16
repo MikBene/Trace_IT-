@@ -12,7 +12,7 @@ urlpatterns = [
     path('home/', views.index, name='index'),
     path('dashboard/', views.dashboard, name='dashboard'),
 
-    # Animals - FIXED: animal_id is now CharField (str), not int
+    # Animals - FIXED: animal_id is CharField (str), not int
     path('animal/<str:animal_id>/', views.animal_detail, name='animal_detail'),
     path('animal/<str:animal_id>/history/', views.location_history, name='location_history'),
     path('animal/<str:animal_id>/weather/', views.weather_data, name='weather_data'),
@@ -43,7 +43,7 @@ urlpatterns = [
     # GPS Simulation
     path('simulate-gps/', views.simulate_gps_data, name='simulate_gps'),
 
-    # API Endpoints - FIXED: animal_id is now CharField (str)
+    # API Endpoints - FIXED: animal_id is CharField (str)
     path('api/location-update/', views.api_location_update, name='api_location_update'),
     path('api/biometric-update/', views.api_biometric_update, name='api_biometric_update'),
     path('api/animal-status/<str:animal_id>/', views.api_animal_status, name='api_animal_status'),
