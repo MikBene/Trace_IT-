@@ -167,7 +167,7 @@ class Animal(models.Model):
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
-
+    
 class TrackingTag(models.Model):
     tag_id = models.AutoField(primary_key=True)
     tag_serial_number = models.CharField(max_length=50, unique=True)

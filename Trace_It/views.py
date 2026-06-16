@@ -18,6 +18,9 @@ import csv
 import requests
 import json
 import time
+import logging
+import traceback
+logger = logging.getLogger(__name__)
 
 
 # ===== UTILITY FUNCTIONS =====
@@ -330,31 +333,42 @@ def logout_view(request):
 
 @login_required
 def index(request):
-    animals = Animal.objects.all()
-    animal_data = []
+    try:
+        animals = Animal.objects.all()
+        animal_data = []
+        
+        for animal in animals:
+            try:
+                latest_location = animal.get_latest_location()
+                latest_biometrics = animal.get_latest_biometrics()
+                battery_level = None
+                if latest_location:
+                    tag = latest_location.tag
+                    battery_level = tag.battery_level if tag else None
 
-    for animal in animals:
-        latest_location = animal.get_latest_location()
-        latest_biometrics = animal.get_latest_biometrics()
-        battery_level = None
-        if latest_location:
-            tag = latest_location.tag
-            battery_level = tag.battery_level if tag else None
+                animal_data.append({
+                    'animal': animal,
+                    'latest_location': latest_location,
+                    'latest_biometrics': latest_biometrics,
+                    'battery_level': battery_level,
+                    'status': 'Active' if animal.get_latest_location() else 'Inactive',
+                    'health_status': animal.health_status,
+                })
+            except Exception as e:
+                print(f"ERROR processing animal {animal.animal_id}: {e}")
+                traceback.print_exc()
+                # Skip this animal but continue with others
+                continue
 
-        animal_data.append({
-            'animal': animal,
-            'latest_location': latest_location,
-            'latest_biometrics': latest_biometrics,
-            'battery_level': battery_level,
-            'status': 'Active' if animal.get_latest_location() else 'Inactive',
-            'health_status': animal.health_status,
-        })
-
-    context = {
-        'animal_data': animal_data,
-        'total_animals': len(animals),
-    }
-    return render(request, 'Trace_It/index.html', context)
+        context = {
+            'animal_data': animal_data,
+            'total_animals': len(animals),
+        }
+        return render(request, 'Trace_It/index.html', context)
+    except Exception as e:
+        print(f"ERROR in index view: {e}")
+        traceback.print_exc()
+        raise
 
 
 @login_required
