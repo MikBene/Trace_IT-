@@ -66,7 +66,8 @@ class Animal(models.Model):
         ('Unknown', 'Unknown'),
     ]
 
-    animal_id = models.AutoField(primary_key=True)
+    # Auto-generated unique animal_id (e.g., ANI-2026-0001)
+    animal_id = models.CharField(max_length=20, primary_key=True, editable=False, unique=True)
     nickname = models.CharField(max_length=50, blank=True, null=True)
     species = models.ForeignKey(Species, on_delete=models.CASCADE)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
@@ -75,9 +76,38 @@ class Animal(models.Model):
     weight = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
     photo = models.ImageField(upload_to='animal_photos/', blank=True, null=True)
     last_seen = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.nickname or f"Animal {self.animal_id}"
+        return f"{self.animal_id} - {self.nickname or 'Unnamed'}"
+
+    def save(self, *args, **kwargs):
+        if not self.animal_id:
+            self.animal_id = self.generate_animal_id()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def generate_animal_id():
+        """Generate unique animal ID in format ANI-YYYY-XXXX"""
+        from django.db.models import Max
+        year = timezone.now().year
+        prefix = f"ANI-{year}-"
+
+        # Get the highest existing ID for this year
+        latest = Animal.objects.filter(animal_id__startswith=prefix).aggregate(
+            max_id=Max('animal_id')
+        )['max_id']
+
+        if latest:
+            try:
+                last_num = int(latest.split('-')[-1])
+                new_num = last_num + 1
+            except (ValueError, IndexError):
+                new_num = 1
+        else:
+            new_num = 1
+
+        return f"{prefix}{new_num:04d}"
 
     def get_latest_location(self):
         deployment = self.deployment_set.filter(is_active=True).first()
@@ -144,6 +174,7 @@ class TrackingTag(models.Model):
     battery_level = models.DecimalField(max_digits=5, decimal_places=2, null=True)
     manufacturer = models.CharField(max_length=100, blank=True, null=True)
     last_service_date = models.DateField(blank=True, null=True)
+    is_assigned = models.BooleanField(default=False)
 
     def __str__(self):
         return self.tag_serial_number
@@ -152,6 +183,10 @@ class TrackingTag(models.Model):
         if self.battery_level and self.battery_level < 20:
             return True
         return False
+
+    def get_current_animal(self):
+        deployment = self.deployment_set.filter(is_active=True).first()
+        return deployment.animal if deployment else None
 
 
 class Deployment(models.Model):
@@ -164,6 +199,12 @@ class Deployment(models.Model):
 
     def __str__(self):
         return f"{self.animal} → {self.tag}"
+
+    def save(self, *args, **kwargs):
+        if self.is_active and not self.pk:
+            self.tag.is_assigned = True
+            self.tag.save()
+        super().save(*args, **kwargs)
 
 
 class Location(models.Model):
@@ -189,17 +230,14 @@ class BiometricReading(models.Model):
     tag = models.ForeignKey(TrackingTag, on_delete=models.CASCADE)
     location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
     
-    # Biometrics
     heart_rate_bpm = models.IntegerField(null=True, blank=True)
     spo2_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     body_temperature_c = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
-    # Accelerometer
     accel_x = models.IntegerField(null=True, blank=True)
     accel_y = models.IntegerField(null=True, blank=True)
     accel_z = models.IntegerField(null=True, blank=True)
     
-    # Metadata
     timestamp = models.DateTimeField(auto_now_add=True)
     sensor_status = models.CharField(max_length=50, default='OK')
 

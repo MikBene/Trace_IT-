@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.db import models
 from .models import Animal, Species, TrackingTag, Deployment, Location, Alert, Geofence, UserProfile, AuditLog, WeatherData, BiometricReading
 from .forms import AnimalForm, TrackingTagForm, GeofenceForm
 import random
@@ -89,9 +90,9 @@ def check_health_alerts(tag, hr, spo2, temp, sensor_status):
     deployment = Deployment.objects.filter(tag=tag, is_active=True).first()
     if not deployment:
         return
-    
+
     animal = deployment.animal
-    
+
     # Sensor error alert
     if sensor_status and sensor_status != 'OK':
         Alert.objects.get_or_create(
@@ -104,7 +105,7 @@ def check_health_alerts(tag, hr, spo2, temp, sensor_status):
             }
         )
         return  # Don't check other vitals if sensor is bad
-    
+
     # Critical HR
     if hr is not None:
         if hr < 30 or hr > 150:
@@ -127,7 +128,7 @@ def check_health_alerts(tag, hr, spo2, temp, sensor_status):
                     'severity': 'HIGH',
                 }
             )
-    
+
     # Low SpO2
     if spo2 is not None:
         if spo2 < 85:
@@ -150,7 +151,7 @@ def check_health_alerts(tag, hr, spo2, temp, sensor_status):
                     'severity': 'HIGH',
                 }
             )
-    
+
     # Temperature
     if temp is not None:
         if temp > 42 or temp < 32:
@@ -394,7 +395,7 @@ def dashboard(request):
     recent_locations = Location.objects.all().select_related('tag').order_by('-timestamp')[:10]
     recent_logs = AuditLog.objects.all().order_by('-timestamp')[:20]
     low_battery_tags = TrackingTag.objects.filter(battery_level__lt=20).count()
-    
+
     recent_biometrics = BiometricReading.objects.all().order_by('-timestamp')[:10]
     sensor_errors = BiometricReading.objects.exclude(sensor_status='OK').count()
     critical_health_alerts = Alert.objects.filter(
@@ -447,14 +448,14 @@ def animal_list(request):
 @admin_required
 def add_animal(request):
     if request.method == 'POST':
-        form = AnimalForm(request.POST, request.FILES)
+        form = AnimalForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             animal = form.save()
             log_action(request.user, 'CREATE_ANIMAL', f'Created animal {animal.nickname} (ID: {animal.animal_id})')
-            messages.success(request, f'Animal "{animal.nickname}" added successfully.')
+            messages.success(request, f'Animal "{animal.nickname}" added successfully with ID {animal.animal_id}.')
             return redirect('animal_list')
     else:
-        form = AnimalForm()
+        form = AnimalForm(user=request.user)
 
     return render(request, 'Trace_It/add_animal.html', {'form': form})
 
@@ -465,14 +466,14 @@ def edit_animal(request, animal_id):
     animal = get_object_or_404(Animal, animal_id=animal_id)
 
     if request.method == 'POST':
-        form = AnimalForm(request.POST, request.FILES, instance=animal)
+        form = AnimalForm(request.POST, request.FILES, instance=animal, user=request.user)
         if form.is_valid():
             form.save()
             log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
             messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
             return redirect('animal_list')
     else:
-        form = AnimalForm(instance=animal)
+        form = AnimalForm(instance=animal, user=request.user)
 
     return render(request, 'Trace_It/edit_animal.html', {'form': form, 'animal': animal})
 
@@ -483,6 +484,9 @@ def delete_animal(request, animal_id):
     animal = get_object_or_404(Animal, animal_id=animal_id)
 
     if request.method == 'POST':
+        # Free up the tag before deleting
+        Deployment.objects.filter(animal=animal, is_active=True).update(is_active=False, end_date=timezone.now())
+
         log_action(request.user, 'DELETE_ANIMAL', f'Deleted animal {animal.nickname} (ID: {animal.animal_id})')
         animal.delete()
         messages.success(request, f'Animal "{animal.nickname}" deleted successfully.')
@@ -533,17 +537,29 @@ def assign_tag(request, tag_id):
         if animal_id:
             animal = get_object_or_404(Animal, animal_id=animal_id)
 
+            # End existing deployment for this tag
+            Deployment.objects.filter(tag=tag, is_active=True).update(is_active=False, end_date=timezone.now())
+
+            # End existing deployment for this animal
+            Deployment.objects.filter(animal=animal, is_active=True).update(is_active=False, end_date=timezone.now())
+
             Deployment.objects.create(
                 tag=tag,
                 animal=animal,
                 is_active=True
             )
 
+            tag.is_assigned = True
+            tag.save()
+
             log_action(request.user, 'ASSIGN_TAG', f'Assigned tag {tag.tag_serial_number} to {animal.nickname}')
             messages.success(request, f'Tag assigned to {animal.nickname}.')
             return redirect('tag_list')
 
-    available_animals = Animal.objects.all()
+    # Only show animals without active tags
+    assigned_animal_ids = Deployment.objects.filter(is_active=True).values_list('animal_id', flat=True)
+    available_animals = Animal.objects.exclude(animal_id__in=assigned_animal_ids)
+
     context = {
         'tag': tag,
         'available_animals': available_animals,
@@ -1050,28 +1066,28 @@ def predict_location(request, animal_id):
 def edit_ranger(request, user_id):
     user = get_object_or_404(User, id=user_id)
     profile = get_object_or_404(UserProfile, user=user)
-    
+
     if request.method == 'POST':
         email = request.POST.get('email', '').strip().lower()
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         phone = request.POST.get('phone', '').strip()
         new_password = request.POST.get('password', '')
-        
+
         errors = []
-        
+
         if not email:
             errors.append("Email is required.")
         elif '@' not in email or '.' not in email.split('@')[-1]:
             errors.append("Please enter a valid email address.")
         elif email != user.email and User.objects.filter(email__iexact=email).exists():
             errors.append(f"A user with email '{email}' already exists.")
-        
+
         if errors:
             for error in errors:
                 messages.error(request, error)
             return redirect('manage_users')
-        
+
         try:
             old_email = user.email
             user.email = email
@@ -1079,21 +1095,21 @@ def edit_ranger(request, user_id):
             user.first_name = first_name
             user.last_name = last_name
             user.save()
-            
+
             profile.phone = phone
             profile.save()
-            
+
             if new_password and len(new_password) >= 6:
                 user.set_password(new_password)
                 user.save()
                 messages.info(request, "Password updated successfully.")
-            
+
             log_action(request.user, 'UPDATE_RANGER', f'Updated ranger {old_email} -> {email}')
             messages.success(request, f'Ranger {email} updated successfully!')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating ranger: {str(e)}')
-    
+
     return redirect('manage_users')
 
 
@@ -1198,28 +1214,28 @@ def api_location_update(request):
 
 @csrf_exempt
 def api_biometric_update(request):
-    """Main IoT endpoint - receives all sensor data from hardware securely via JSON."""
+    """Main IoT endpoint - receives all sensor data from ESP32 hardware securely via JSON."""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'POST only allowed'}, status=405)
-    
+
     try:
         if request.content_type == 'application/json':
             data = json.loads(request.body)
         else:
             data = request.POST
-        
+
         tag_serial = data.get('tag_serial') or data.get('tag_serial_number')
         lat = data.get('lat') or data.get('latitude')
         lon = data.get('lon') or data.get('longitude')
-        
+
         if not tag_serial or lat is None or lon is None:
             return JsonResponse({
                 'status': 'error', 
                 'message': 'Missing required fields: tag_serial, lat, lon'
             }, status=400)
-        
+
         tag = TrackingTag.objects.get(tag_serial_number=tag_serial)
-        
+
         # Explicit conversion safely handled via float definitions
         location = Location.objects.create(
             tag=tag,
@@ -1229,20 +1245,20 @@ def api_biometric_update(request):
             temperature=parse_sentinel(data.get('temp')) or parse_sentinel(data.get('temperature')),
             speed=parse_sentinel(data.get('speed')),
         )
-        
+
         hr = parse_int_sentinel(data.get('hr')) or parse_int_sentinel(data.get('heart_rate'))
         spo2 = parse_sentinel(data.get('spo2'))
         body_temp = parse_sentinel(data.get('body_temp')) or parse_sentinel(data.get('body_temperature'))
         accel_x = parse_int_sentinel(data.get('acc_x')) or parse_int_sentinel(data.get('accel_x'))
         accel_y = parse_int_sentinel(data.get('acc_y')) or parse_int_sentinel(data.get('accel_y'))
         accel_z = parse_int_sentinel(data.get('acc_z')) or parse_int_sentinel(data.get('accel_z'))
-        
+
         # Update device tracking hardware power levels directly from hardware transmission if present
         battery = data.get('battery') or data.get('battery_level')
         if battery is not None:
             tag.battery_level = float(battery)
             tag.save()
-        
+
         sensor_status = 'OK'
         if hr is None and spo2 is None and body_temp is None:
             sensor_status = 'ALL_SENSORS_DISCONNECTED'
@@ -1252,7 +1268,7 @@ def api_biometric_update(request):
             sensor_status = 'SPO2_SENSOR_DISCONNECTED'
         elif body_temp is None:
             sensor_status = 'TEMP_SENSOR_DISCONNECTED'
-        
+
         bio = BiometricReading.objects.create(
             tag=tag,
             location=location,
@@ -1264,22 +1280,22 @@ def api_biometric_update(request):
             accel_z=accel_z,
             sensor_status=sensor_status,
         )
-        
+
         check_health_alerts(tag, hr, spo2, body_temp, sensor_status)
-        
+
         deployment = Deployment.objects.filter(tag=tag, is_active=True).first()
         if deployment:
             check_geofence_violations(deployment.animal, location)
             check_stationary_alert(deployment.animal)
-        
+
         return JsonResponse({
             'status': 'success',
             'location_id': location.location_id,
             'reading_id': bio.reading_id,
             'sensor_status': sensor_status,
         })
-    
-        
+
+
     except TrackingTag.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Tag not found'}, status=404)
     except json.JSONDecodeError:
@@ -1403,7 +1419,7 @@ def api_prediction_json(request, animal_id):
 @login_required
 def vitals_stream(request, animal_id):
     animal = get_object_or_404(Animal, animal_id=animal_id)
-    
+
     def event_stream():
         last_reading_id = None
         while True:
@@ -1411,7 +1427,7 @@ def vitals_stream(request, animal_id):
                 latest = BiometricReading.objects.filter(
                     tag__deployment__animal=animal
                 ).order_by('-timestamp').first()
-                
+
                 if latest and latest.reading_id != last_reading_id:
                     last_reading_id = latest.reading_id
                     payload = json.dumps({
@@ -1425,13 +1441,13 @@ def vitals_stream(request, animal_id):
                         'timestamp': latest.timestamp.isoformat(),
                     })
                     yield f"data: {payload}\n\n"
-                
+
                 time.sleep(2)
-                
+
             except Exception:
                 time.sleep(2)
                 continue
-    
+
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
