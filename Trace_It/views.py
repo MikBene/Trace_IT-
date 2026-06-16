@@ -466,14 +466,36 @@ def edit_animal(request, animal_id):
     animal = get_object_or_404(Animal, animal_id=animal_id)
 
     if request.method == 'POST':
-        form = AnimalForm(request.POST, request.FILES, instance=animal, user=request.user)
-        if form.is_valid():
-            form.save()
-            log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
-            messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
-            return redirect('animal_list')
+        try:
+            form = AnimalForm(request.POST, request.FILES, instance=animal, user=request.user)
+            if form.is_valid():
+                try:
+                    form.save()
+                    log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
+                    messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
+                    return redirect('animal_list')
+                except Exception as e:
+                    import traceback
+                    print(f"ERROR saving animal {animal_id}: {e}")
+                    traceback.print_exc()
+                    messages.error(request, f'Error saving: {str(e)}')
+            else:
+                print(f"Form invalid: {form.errors}")
+                messages.error(request, 'Please correct the errors below.')
+        except Exception as e:
+            import traceback
+            print(f"ERROR creating form for {animal_id}: {e}")
+            traceback.print_exc()
+            messages.error(request, f'Form error: {str(e)}')
     else:
-        form = AnimalForm(instance=animal, user=request.user)
+        try:
+            form = AnimalForm(instance=animal, user=request.user)
+        except Exception as e:
+            import traceback
+            print(f"ERROR loading form for {animal_id}: {e}")
+            traceback.print_exc()
+            messages.error(request, f'Error loading form: {str(e)}')
+            form = None
 
     return render(request, 'Trace_It/edit_animal.html', {'form': form, 'animal': animal})
 
