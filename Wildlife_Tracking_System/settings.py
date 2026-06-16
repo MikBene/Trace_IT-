@@ -128,3 +128,7 @@ LOGGING = {
         'Trace_It': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
     },
 }
+
+# Add these to settings.py
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
