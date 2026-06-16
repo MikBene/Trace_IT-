@@ -60,16 +60,30 @@ class AnimalForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        # If editing, include the currently assigned tag in the queryset
+        # If editing, set initial values from existing instance
         if self.instance and self.instance.pk:
+            # Set species_name from existing species
+            if self.instance.species:
+                self.fields['species_name'].initial = self.instance.species.common_name
+            
+            # Set esp32_tag from existing deployment
             current_tag_id = None
             deployment = self.instance.deployment_set.filter(is_active=True).first()
             if deployment:
                 current_tag_id = deployment.tag_id
                 self.fields['esp32_tag'].initial = deployment.tag
-            self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(
-                models.Q(is_assigned=False) | models.Q(tag_id=current_tag_id)
-            ) if current_tag_id else TrackingTag.objects.filter(is_assigned=False)
+            
+            # Show unassigned tags PLUS the currently assigned tag
+            if current_tag_id:
+                self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(
+                    models.Q(is_assigned=False) | models.Q(tag_id=current_tag_id)
+                )
+            else:
+                self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        return cleaned_data
 
     def save(self, commit=True):
         # Get values BEFORE calling super save
@@ -92,33 +106,50 @@ class AnimalForm(forms.ModelForm):
         # Set species on instance
         self.instance.species = species_obj
         
-        # Save the animal (auto-generates animal_id)
+        # Save the animal (auto-generates animal_id for new, keeps existing for edit)
         instance = super().save(commit=commit)
         
         # Handle ESP32 tag assignment
         if esp32_tag:
-            # End any existing active deployment for this tag
-            Deployment.objects.filter(tag=esp32_tag, is_active=True).update(
-                is_active=False, 
-                end_date=timezone.now()
-            )
-            
-            # End any existing active deployment for this animal
-            Deployment.objects.filter(animal=instance, is_active=True).update(
-                is_active=False,
-                end_date=timezone.now()
-            )
-            
-            # Create new deployment linking animal to tag
-            Deployment.objects.create(
-                animal=instance,
-                tag=esp32_tag,
-                is_active=True
-            )
-            
-            # Mark tag as assigned
-            esp32_tag.is_assigned = True
-            esp32_tag.save()
+            # Check if this tag is already assigned to this animal
+            existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
+            if not existing:
+                # End any existing active deployment for this tag (on other animals)
+                Deployment.objects.filter(tag=esp32_tag, is_active=True).exclude(animal=instance).update(
+                    is_active=False, 
+                    end_date=timezone.now()
+                )
+                
+                # End any existing active deployment for this animal (with different tag)
+                old_deployments = Deployment.objects.filter(animal=instance, is_active=True).exclude(tag=esp32_tag)
+                for dep in old_deployments:
+                    dep.is_active = False
+                    dep.end_date = timezone.now()
+                    dep.save()
+                    # Mark old tag as unassigned
+                    dep.tag.is_assigned = False
+                    dep.tag.save()
+                
+                # Create new deployment linking animal to tag
+                Deployment.objects.create(
+                    animal=instance,
+                    tag=esp32_tag,
+                    is_active=True
+                )
+                
+                # Mark tag as assigned
+                esp32_tag.is_assigned = True
+                esp32_tag.save()
+        else:
+            # User selected "No Tag" - end all active deployments for this animal
+            old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
+            for dep in old_deployments:
+                dep.is_active = False
+                dep.end_date = timezone.now()
+                dep.save()
+                # Mark old tag as unassigned
+                dep.tag.is_assigned = False
+                dep.tag.save()
 
         return instance
 
