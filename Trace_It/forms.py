@@ -47,7 +47,7 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
-        # ONLY actual model fields here - species_name and esp32_tag are form-only!
+        # ONLY actual model fields here
         fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'photo']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
@@ -69,10 +69,13 @@ class AnimalForm(forms.ModelForm):
             
             # Set esp32_tag from existing deployment
             current_tag_id = None
-            deployment = self.instance.deployment_set.filter(is_active=True).first()
-            if deployment:
-                current_tag_id = deployment.tag_id
-                self.fields['esp32_tag'].initial = deployment.tag
+            try:
+                deployment = self.instance.deployment_set.filter(is_active=True).first()
+                if deployment:
+                    current_tag_id = deployment.tag_id
+                    self.fields['esp32_tag'].initial = deployment.tag
+            except Exception:
+                pass  # Ignore if deployment query fails
             
             # Show unassigned tags PLUS the currently assigned tag
             if current_tag_id:
@@ -84,10 +87,16 @@ class AnimalForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        # Validate species_name is in choices
+        species_name = cleaned_data.get('species_name')
+        if species_name:
+            valid_species = [choice[0] for choice in self.SPECIES_CHOICES if choice[0]]
+            if species_name not in valid_species:
+                self.add_error('species_name', 'Please select a valid species.')
         return cleaned_data
 
     def save(self, commit=True):
-        # Get values BEFORE calling super save
+        # Get values from cleaned_data
         species_name = self.cleaned_data.get('species_name')
         esp32_tag = self.cleaned_data.get('esp32_tag')
         
@@ -99,15 +108,14 @@ class AnimalForm(forms.ModelForm):
             'Zebra': 'Equus quagga',
         }
 
-        species_obj, created = Species.objects.get_or_create(
-            common_name=species_name,
-            defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
-        )
+        if species_name:
+            species_obj, created = Species.objects.get_or_create(
+                common_name=species_name,
+                defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
+            )
+            self.instance.species = species_obj
         
-        # Set species on instance
-        self.instance.species = species_obj
-        
-        # Save the animal (auto-generates animal_id for new, keeps existing for edit)
+        # Save the animal
         instance = super().save(commit=commit)
         
         # Handle ESP32 tag assignment
@@ -127,28 +135,25 @@ class AnimalForm(forms.ModelForm):
                     dep.is_active = False
                     dep.end_date = timezone.now()
                     dep.save()
-                    # Mark old tag as unassigned
                     dep.tag.is_assigned = False
                     dep.tag.save()
                 
-                # Create new deployment linking animal to tag
+                # Create new deployment
                 Deployment.objects.create(
                     animal=instance,
                     tag=esp32_tag,
                     is_active=True
                 )
                 
-                # Mark tag as assigned
                 esp32_tag.is_assigned = True
                 esp32_tag.save()
         else:
-            # User selected "No Tag" - end all active deployments for this animal
+            # User selected "No Tag" - end all active deployments
             old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
             for dep in old_deployments:
                 dep.is_active = False
                 dep.end_date = timezone.now()
                 dep.save()
-                # Mark old tag as unassigned
                 dep.tag.is_assigned = False
                 dep.tag.save()
 
