@@ -131,20 +131,6 @@
         padding: 25px;
     }
 
-    .animal-photo {
-        width: 100%;
-        height: 160px;
-        border-radius: 15px;
-        object-fit: cover;
-        border: 2px solid rgba(255, 255, 255, 0.1);
-        transition: all 0.3s;
-    }
-
-    .animal-card:hover .animal-photo {
-        border-color: rgba(25, 135, 84, 0.4);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-    }
-
     .photo-placeholder {
         width: 100%;
         height: 160px;
@@ -525,13 +511,9 @@
                         <div class="row">
                             <!-- Photo Column -->
                             <div class="col-md-4 text-center mb-3 mb-md-0">
-                                {% if item.animal.photo %}
-                                    <img src="{{ item.animal.photo.url }}" class="animal-photo" alt="{{ item.animal.nickname }}">
-                                {% else %}
-                                    <div class="photo-placeholder">
-                                        🦁
-                                    </div>
-                                {% endif %}
+                                <div class="photo-placeholder">
+                                    🦁
+                                </div>
                             </div>
 
                             <!-- Info Column -->

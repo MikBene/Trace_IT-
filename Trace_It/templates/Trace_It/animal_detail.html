@@ -11,13 +11,9 @@
                 <h4 class="mb-0">{{ animal.nickname }}</h4>
             </div>
             <div class="card-body text-center">
-                {% if animal.photo %}
-                    <img src="{{ animal.photo.url }}" class="img-fluid rounded mb-3" style="max-height: 200px;">
-                {% else %}
-                    <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3" style="height: 200px;">
-                        <span class="text-muted">No Photo</span>
-                    </div>
-                {% endif %}
+                <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3" style="height: 200px;">
+                    <span style="font-size: 80px;">🦁</span>
+                </div>
                 <h5>{{ animal.species.common_name }}</h5>
                 <p class="text-muted"><em>{{ animal.species.scientific_name }}</em></p>
                 <hr>
@@ -237,7 +233,7 @@ function predictNext(animalId) {
 (function() {
     let evtSource = null;
     let reconnectAttempts = 0;
-    const maxReconnectDelay = 30000; // Max 30 seconds between retries
+    const maxReconnectDelay = 30000;
     const animalId = {{ animal.animal_id }};
     const statusBadge = document.getElementById('vitals-status');
     
@@ -249,7 +245,6 @@ function predictNext(animalId) {
     }
     
     function connect() {
-        // Close existing connection if any
         if (evtSource) {
             evtSource.close();
         }
@@ -266,14 +261,12 @@ function predictNext(animalId) {
         evtSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             
-            // Handle server-sent reconnect signal
             if (data.reconnect) {
                 evtSource.close();
                 setTimeout(connect, 1000);
                 return;
             }
             
-            // Update heart rate
             if (data.hr !== null && data.hr !== undefined) {
                 const hrEl = document.getElementById('hr-display');
                 if (hrEl) {
@@ -282,13 +275,11 @@ function predictNext(animalId) {
                 }
             }
             
-            // Update SpO2
             if (data.spo2 !== null && data.spo2 !== undefined) {
                 const spo2El = document.getElementById('spo2-display');
                 if (spo2El) spo2El.innerText = Math.round(data.spo2);
             }
             
-            // Update temperature
             if (data.temp !== null && data.temp !== undefined) {
                 const tempEl = document.getElementById('temp-display');
                 if (tempEl) {
@@ -297,7 +288,6 @@ function predictNext(animalId) {
                 }
             }
             
-            // Update accelerometer
             if (data.accel_x !== undefined) {
                 const accelEl = document.getElementById('accel-display');
                 if (accelEl) {
@@ -305,7 +295,6 @@ function predictNext(animalId) {
                 }
             }
             
-            // Update last update time
             const lastUpdateEl = document.getElementById('last-update');
             if (lastUpdateEl) {
                 lastUpdateEl.innerText = 'Just now';
@@ -316,7 +305,6 @@ function predictNext(animalId) {
             evtSource.close();
             updateStatus('Reconnecting...', 'bg-warning text-dark');
             
-            // Exponential backoff: 1s, 2s, 4s, 8s... up to 30s
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
             reconnectAttempts++;
             
@@ -324,10 +312,8 @@ function predictNext(animalId) {
         };
     }
     
-    // Start connection when page loads
     connect();
     
-    // Cleanup on page unload
     window.addEventListener('beforeunload', function() {
         if (evtSource) evtSource.close();
     });

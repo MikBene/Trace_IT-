@@ -37,9 +37,9 @@ class AnimalForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # ESP32 Tag selection - only show unassigned tags
+    # ESP32 Tag selection - queryset set in __init__ to avoid AppRegistryNotReady
     esp32_tag = forms.ModelChoiceField(
-        queryset=TrackingTag.objects.filter(is_assigned=False),
+        queryset=TrackingTag.objects.none(),
         required=False,
         label='Attach ESP32 Tag',
         empty_label='-- No Tag (Select Later) --',
@@ -48,13 +48,12 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
-        fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'photo']
+        fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
             'birth_year': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 2018'}),
             'weight': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Weight in kg', 'step': '0.01'}),
             'health_status': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Healthy, Injured, Sick'}),
-            'photo': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -62,13 +61,14 @@ class AnimalForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         try:
+            # Set queryset here instead of at class level to avoid AppRegistryNotReady
+            self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
+            
             # If editing, set initial values from existing instance
             if self.instance and self.instance.pk:
-                # Set species_name from existing species
                 if hasattr(self.instance, 'species') and self.instance.species:
                     self.fields['species_name'].initial = self.instance.species.common_name
                 
-                # Set esp32_tag from existing deployment
                 current_tag_id = None
                 try:
                     deployment = self.instance.deployment_set.filter(is_active=True).first()
@@ -78,7 +78,6 @@ class AnimalForm(forms.ModelForm):
                 except Exception as e:
                     print(f"Warning: Could not load deployment: {e}")
                 
-                # Show unassigned tags PLUS the currently assigned tag
                 if current_tag_id:
                     self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(
                         models.Q(is_assigned=False) | models.Q(tag_id=current_tag_id)
