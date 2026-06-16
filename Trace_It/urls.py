@@ -11,6 +11,7 @@ urlpatterns = [
     # Home / Dashboard
     path('home/', views.index, name='index'),
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('animal/<str:animal_id>/delete/', views.delete_animal, name='delete_animal'),
 
     # Animals - FIXED: animal_id is CharField (str), not int
     path('animal/<str:animal_id>/', views.animal_detail, name='animal_detail'),

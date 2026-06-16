@@ -396,6 +396,61 @@ def animal_detail(request, animal_id):
     }
     return render(request, 'Trace_It/animal_detail.html', context)
 
+@login_required
+@admin_required
+def edit_animal(request, animal_id):
+    animal = get_object_or_404(Animal, animal_id=animal_id)
+
+    if request.method == 'POST':
+        form = AnimalForm(request.POST, request.FILES, instance=animal, user=request.user)
+        if form.is_valid():
+            try:
+                animal = form.save()
+                log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
+                messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
+                return redirect('index')
+            except Exception as e:
+                import traceback
+                print(f"SAVE ERROR: {e}")
+                traceback.print_exc()
+                messages.error(request, f'Error saving: {str(e)}')
+        else:
+            print(f"FORM ERRORS: {form.errors}")
+            messages.error(request, 'Please fix the errors below.')
+    else:
+        form = AnimalForm(instance=animal, user=request.user)
+
+    return render(request, 'Trace_It/edit_animal.html', {'form': form, 'animal': animal})
+
+
+@login_required
+@admin_required
+def delete_animal(request, animal_id):
+    animal = get_object_or_404(Animal, animal_id=animal_id)
+
+    if request.method == 'POST':
+        try:
+            nickname = animal.nickname or f"Animal {animal.animal_id}"
+            
+            # Free up all tags
+            deployments = Deployment.objects.filter(animal=animal)
+            for dep in deployments:
+                if dep.tag:
+                    dep.tag.is_assigned = False
+                    dep.tag.save()
+            
+            animal.delete()
+            log_action(request.user, 'DELETE_ANIMAL', f'Deleted {nickname} (ID: {animal_id})')
+            messages.success(request, f'Animal "{nickname}" deleted successfully.')
+        except Exception as e:
+            import traceback
+            print(f"DELETE ERROR: {e}")
+            traceback.print_exc()
+            messages.error(request, f'Could not delete: {str(e)}')
+        
+        return redirect('index')
+
+    return redirect('index')
 
 @login_required
 @admin_required
