@@ -1,1 +1,1 @@
-echo web: gunicorn Wildlife_Tracking_System.wsgi:application > Procfile
+web: gunicorn --config gunicorn.conf.py your_project.wsgi:application

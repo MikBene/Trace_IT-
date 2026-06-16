@@ -56,7 +56,7 @@
         <div class="card shadow mt-3 card-animated">
             <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> Live Vitals</h5>
-                <span class="badge bg-light text-danger" id="vitals-status">Live</span>
+                <span class="badge bg-light text-danger" id="vitals-status">Connecting...</span>
             </div>
             <div class="card-body">
                 {% if latest_biometrics %}
@@ -108,7 +108,7 @@
                     {% endif %}
                     
                     <small class="text-muted d-block mt-2 text-center">
-                        <i class="bi bi-clock"></i> Last update: {{ latest_biometrics.timestamp|timesince }} ago
+                        <i class="bi bi-clock"></i> Last update: <span id="last-update">{{ latest_biometrics.timestamp|timesince }}</span> ago
                     </small>
                 {% else %}
                     <div class="text-center py-3">
@@ -200,7 +200,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Weather fetch
+// ============ WEATHER & PREDICTION ============
 function getWeather(animalId) {
     fetch('/api/weather/' + animalId + '/')
         .then(response => response.json())
@@ -217,7 +217,6 @@ function getWeather(animalId) {
         });
 }
 
-// Prediction fetch
 function predictNext(animalId) {
     fetch('/api/predict/' + animalId + '/')
         .then(response => response.json())
@@ -234,40 +233,107 @@ function predictNext(animalId) {
         });
 }
 
-// Live vitals SSE stream
-const evtSource = new EventSource("/api/vitals-stream/{{ animal.animal_id }}/");
-evtSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
+// ============ LIVE VITALS SSE STREAM (AUTO-RECONNECT) ============
+(function() {
+    let evtSource = null;
+    let reconnectAttempts = 0;
+    const maxReconnectDelay = 30000; // Max 30 seconds between retries
+    const animalId = {{ animal.animal_id }};
+    const statusBadge = document.getElementById('vitals-status');
     
-    if (data.hr !== null && data.hr !== undefined) {
-        document.getElementById('hr-display').innerText = data.hr;
-        if (data.hr < 30 || data.hr > 150) {
-            document.getElementById('hr-display').className = 'display-6 fw-bold text-danger';
-        } else {
-            document.getElementById('hr-display').className = 'display-6 fw-bold text-success';
+    function updateStatus(text, className) {
+        if (statusBadge) {
+            statusBadge.textContent = text;
+            statusBadge.className = 'badge ' + className;
         }
     }
     
-    if (data.spo2 !== null && data.spo2 !== undefined) {
-        document.getElementById('spo2-display').innerText = Math.round(data.spo2);
-    }
-    
-    if (data.temp !== null && data.temp !== undefined) {
-        document.getElementById('temp-display').innerText = data.temp.toFixed(1);
-        if (data.temp > 40 || data.temp < 35) {
-            document.getElementById('temp-display').className = 'display-6 fw-bold text-danger';
-        } else {
-            document.getElementById('temp-display').className = 'display-6 fw-bold text-warning';
+    function connect() {
+        // Close existing connection if any
+        if (evtSource) {
+            evtSource.close();
         }
+        
+        updateStatus('Connecting...', 'bg-secondary text-white');
+        
+        evtSource = new EventSource('/api/vitals-stream/' + animalId + '/');
+        
+        evtSource.onopen = function() {
+            reconnectAttempts = 0;
+            updateStatus('Live', 'bg-light text-danger');
+        };
+        
+        evtSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            // Handle server-sent reconnect signal
+            if (data.reconnect) {
+                evtSource.close();
+                setTimeout(connect, 1000);
+                return;
+            }
+            
+            // Update heart rate
+            if (data.hr !== null && data.hr !== undefined) {
+                const hrEl = document.getElementById('hr-display');
+                if (hrEl) {
+                    hrEl.innerText = data.hr;
+                    hrEl.className = 'display-6 fw-bold ' + ((data.hr < 30 || data.hr > 150) ? 'text-danger' : 'text-success');
+                }
+            }
+            
+            // Update SpO2
+            if (data.spo2 !== null && data.spo2 !== undefined) {
+                const spo2El = document.getElementById('spo2-display');
+                if (spo2El) spo2El.innerText = Math.round(data.spo2);
+            }
+            
+            // Update temperature
+            if (data.temp !== null && data.temp !== undefined) {
+                const tempEl = document.getElementById('temp-display');
+                if (tempEl) {
+                    tempEl.innerText = data.temp.toFixed(1);
+                    tempEl.className = 'display-6 fw-bold ' + ((data.temp > 40 || data.temp < 35) ? 'text-danger' : 'text-warning');
+                }
+            }
+            
+            // Update accelerometer
+            if (data.accel_x !== undefined) {
+                const accelEl = document.getElementById('accel-display');
+                if (accelEl) {
+                    accelEl.innerText = 'X:' + data.accel_x + ' Y:' + data.accel_y + ' Z:' + data.accel_z;
+                }
+            }
+            
+            // Update last update time
+            const lastUpdateEl = document.getElementById('last-update');
+            if (lastUpdateEl) {
+                lastUpdateEl.innerText = 'Just now';
+            }
+        };
+        
+        evtSource.onerror = function() {
+            evtSource.close();
+            updateStatus('Reconnecting...', 'bg-warning text-dark');
+            
+            // Exponential backoff: 1s, 2s, 4s, 8s... up to 30s
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+            reconnectAttempts++;
+            
+            setTimeout(connect, delay);
+        };
     }
     
-    if (data.accel_x !== undefined) {
-        document.getElementById('accel-display').innerText = 
-            'X:' + data.accel_x + ' Y:' + data.accel_y + ' Z:' + data.accel_z;
-    }
-};
+    // Start connection when page loads
+    connect();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (evtSource) evtSource.close();
+    });
+})();
 
-// Vitals History Chart
+// ============ VITALS HISTORY CHART ============
 {% if biometric_history %}
 const ctx = document.getElementById('vitalsChart').getContext('2d');
 const vitalsChart = new Chart(ctx, {

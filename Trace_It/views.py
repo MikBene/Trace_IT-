@@ -1520,15 +1520,22 @@ def api_prediction_json(request, animal_id):
 @login_required
 def vitals_stream(request, animal_id):
     animal = get_object_or_404(Animal, animal_id=animal_id)
-
+    
     def event_stream():
         last_reading_id = None
+        start_time = time.time()
+        max_duration = 25  # End BEFORE Gunicorn kills us
+        
         while True:
             try:
+                if time.time() - start_time > max_duration:
+                    yield f"data: {json.dumps({'reconnect': True})}\n\n"
+                    break
+                
                 latest = BiometricReading.objects.filter(
                     tag__deployment__animal=animal
                 ).order_by('-timestamp').first()
-
+                
                 if latest and latest.reading_id != last_reading_id:
                     last_reading_id = latest.reading_id
                     payload = json.dumps({
@@ -1542,13 +1549,12 @@ def vitals_stream(request, animal_id):
                         'timestamp': latest.timestamp.isoformat(),
                     })
                     yield f"data: {payload}\n\n"
-
-                time.sleep(2)
-
+                
+                time.sleep(1)
+                
             except Exception:
-                time.sleep(2)
-                continue
-
+                break
+    
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
