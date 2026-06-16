@@ -580,10 +580,15 @@ def add_geofence(request):
     if request.method == 'POST':
         form = GeofenceForm(request.POST)
         if form.is_valid():
-            geofence = form.save()
-            log_action(request.user, 'CREATE_GEOFENCE', f'Created geofence {geofence.name}')
-            messages.success(request, f'Geofence "{geofence.name}" created.')
-            return redirect('geofence_list')
+            try:
+                geofence = form.save()
+                log_action(request.user, 'CREATE_GEOFENCE', f'Created geofence {geofence.name}')
+                messages.success(request, f'Geofence "{geofence.name}" created successfully.')
+                return redirect('geofence_list')
+            except Exception as e:
+                messages.error(request, f'Error saving geofence: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = GeofenceForm()
 
@@ -598,10 +603,15 @@ def edit_geofence(request, geofence_id):
     if request.method == 'POST':
         form = GeofenceForm(request.POST, instance=geofence)
         if form.is_valid():
-            form.save()
-            log_action(request.user, 'UPDATE_GEOFENCE', f'Updated geofence {geofence.name}')
-            messages.success(request, f'Geofence updated.')
-            return redirect('geofence_list')
+            try:
+                form.save()
+                log_action(request.user, 'UPDATE_GEOFENCE', f'Updated geofence {geofence.name}')
+                messages.success(request, f'Geofence "{geofence.name}" updated successfully.')
+                return redirect('geofence_list')
+            except Exception as e:
+                messages.error(request, f'Error updating geofence: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = GeofenceForm(instance=geofence)
 
