@@ -40,9 +40,12 @@ urlpatterns = [
     path('alerts/', views.alerts, name='alerts'),
     path('alert/<int:alert_id>/resolve/', views.resolve_alert, name='resolve_alert'),
 
-    # Export
+    # Export - both old and new names for compatibility
     path('export/locations/', views.export_locations_csv, name='export_locations_csv'),
     path('export/alerts/', views.export_alerts_csv, name='export_alerts_csv'),
+    # Alias for templates that use old name
+    path('export/locations/', views.export_locations_csv, name='export_locations'),
+    path('export/alerts/', views.export_alerts_csv, name='export_alerts'),
 
     # Audit Log
     path('audit-log/', views.audit_log, name='audit_log'),
