@@ -6,7 +6,7 @@ import traceback
 
 
 class AnimalForm(forms.ModelForm):
-    """Form for adding/editing animals with 4 default species choices."""
+    """Form for adding/editing animals with species choices and ESP32 tag attachment."""
 
     SPECIES_CHOICES = [
         ('', '-- Select Species --'),
@@ -48,27 +48,28 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
-        fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status']
+        fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'notes']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
             'birth_year': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 2018'}),
             'weight': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Weight in kg', 'step': '0.01'}),
             'health_status': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Healthy, Injured, Sick'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Additional notes...', 'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
+
         try:
             # Set queryset here instead of at class level to avoid AppRegistryNotReady
             self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
-            
+
             # If editing, set initial values from existing instance
             if self.instance and self.instance.pk:
                 if hasattr(self.instance, 'species') and self.instance.species:
                     self.fields['species_name'].initial = self.instance.species.common_name
-                
+
                 current_tag_id = None
                 try:
                     deployment = self.instance.deployment_set.filter(is_active=True).first()
@@ -77,7 +78,7 @@ class AnimalForm(forms.ModelForm):
                         self.fields['esp32_tag'].initial = deployment.tag
                 except Exception as e:
                     print(f"Warning: Could not load deployment: {e}")
-                
+
                 if current_tag_id:
                     self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(
                         models.Q(is_assigned=False) | models.Q(tag_id=current_tag_id)
@@ -101,7 +102,7 @@ class AnimalForm(forms.ModelForm):
         try:
             species_name = self.cleaned_data.get('species_name')
             esp32_tag = self.cleaned_data.get('esp32_tag')
-            
+
             species_map = {
                 'Lion': 'Panthera leo',
                 'Elephant': 'Loxodonta africana',
@@ -115,9 +116,9 @@ class AnimalForm(forms.ModelForm):
                     defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
                 )
                 self.instance.species = species_obj
-            
+
             instance = super().save(commit=commit)
-            
+
             if esp32_tag:
                 existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
                 if not existing:
@@ -125,7 +126,7 @@ class AnimalForm(forms.ModelForm):
                         is_active=False, 
                         end_date=timezone.now()
                     )
-                    
+
                     old_deployments = Deployment.objects.filter(animal=instance, is_active=True).exclude(tag=esp32_tag)
                     for dep in old_deployments:
                         dep.is_active = False
@@ -133,7 +134,7 @@ class AnimalForm(forms.ModelForm):
                         dep.save()
                         dep.tag.is_assigned = False
                         dep.tag.save()
-                    
+
                     Deployment.objects.create(animal=instance, tag=esp32_tag, is_active=True)
                     esp32_tag.is_assigned = True
                     esp32_tag.save()
