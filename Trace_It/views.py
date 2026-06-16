@@ -517,12 +517,17 @@ def animal_list(request):
 @admin_required
 def add_animal(request):
     if request.method == 'POST':
-        form = AnimalForm(request.POST, request.FILES, user=request.user)
+        form = AnimalForm(request.POST, request.FILES, user=request.user)  # <-- request.FILES
         if form.is_valid():
-            animal = form.save()
-            log_action(request.user, 'CREATE_ANIMAL', f'Created animal {animal.nickname} (ID: {animal.animal_id})')
-            messages.success(request, f'Animal "{animal.nickname}" added successfully with ID {animal.animal_id}.')
-            return redirect('animal_list')
+            try:
+                animal = form.save()
+                log_action(request.user, 'CREATE_ANIMAL', f'Added animal {animal.nickname} (ID: {animal.animal_id})')
+                messages.success(request, f'Animal "{animal.nickname}" added successfully.')
+                return redirect('index')
+            except Exception as e:
+                messages.error(request, f'Error saving: {str(e)}')
+        else:
+            messages.error(request, 'Please fix the errors below.')
     else:
         form = AnimalForm(user=request.user)
 
