@@ -47,7 +47,8 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
-        fields = ['nickname', 'species_name', 'gender', 'birth_year', 'weight', 'health_status', 'photo', 'esp32_tag']
+        # ONLY actual model fields here - species_name and esp32_tag are form-only!
+        fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'photo']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
             'birth_year': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 2018'}),
