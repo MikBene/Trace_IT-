@@ -66,7 +66,6 @@ class Animal(models.Model):
         ('Unknown', 'Unknown'),
     ]
 
-    # Auto-generated unique animal_id (e.g., ANI-2026-0001)
     animal_id = models.CharField(max_length=20, primary_key=True, editable=False, unique=True)
     nickname = models.CharField(max_length=50, blank=True, null=True)
     species = models.ForeignKey(Species, on_delete=models.CASCADE)
@@ -78,6 +77,11 @@ class Animal(models.Model):
     last_seen = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Templates using animal.id will now work
+    @property
+    def id(self):
+        return self.animal_id
+
     def __str__(self):
         return f"{self.animal_id} - {self.nickname or 'Unnamed'}"
 
@@ -88,12 +92,10 @@ class Animal(models.Model):
 
     @staticmethod
     def generate_animal_id():
-        """Generate unique animal ID in format ANI-YYYY-XXXX"""
         from django.db.models import Max
         year = timezone.now().year
         prefix = f"ANI-{year}-"
 
-        # Get the highest existing ID for this year
         latest = Animal.objects.filter(animal_id__startswith=prefix).aggregate(
             max_id=Max('animal_id')
         )['max_id']
@@ -116,10 +118,11 @@ class Animal(models.Model):
         return None
 
     def get_all_locations(self, limit=100):
+        """Return list instead of QuerySet to avoid sliced QuerySet filter issues."""
         deployment = self.deployment_set.filter(is_active=True).first()
         if deployment:
-            return Location.objects.filter(tag=deployment.tag).order_by('-timestamp')[:limit]
-        return Location.objects.none()
+            return list(Location.objects.filter(tag=deployment.tag).order_by('-timestamp')[:limit])
+        return []
 
     def get_latest_biometrics(self):
         deployment = self.deployment_set.filter(is_active=True).first()
@@ -128,26 +131,24 @@ class Animal(models.Model):
         return None
 
     def is_stationary(self, minutes=90):
+        """Check if animal has been stationary. Filters in Python to avoid QuerySet slice issues."""
         locations = self.get_all_locations(limit=10)
-        if locations.count() < 2:
+        if len(locations) < 2:
             return False
         
-        latest = locations.first()
+        latest = locations[0] if locations else None
         if not latest:
             return False
             
         time_threshold = timezone.now() - timezone.timedelta(minutes=minutes)
-        recent_locations = locations.filter(timestamp__gte=time_threshold)
+        recent_locations = [loc for loc in locations if loc.timestamp >= time_threshold]
         
-        if recent_locations.count() < 2:
+        if len(recent_locations) < 2:
             return False
             
-        first_loc = recent_locations.last()
-        last_loc = recent_locations.first()
+        first_loc = recent_locations[-1]
+        last_loc = recent_locations[0]
         
-        if not first_loc or not last_loc:
-            return False
-            
         distance = self.calculate_distance(
             float(first_loc.latitude), float(first_loc.longitude),
             float(last_loc.latitude), float(last_loc.longitude)
@@ -167,7 +168,7 @@ class Animal(models.Model):
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
-    
+
 class TrackingTag(models.Model):
     tag_id = models.AutoField(primary_key=True)
     tag_serial_number = models.CharField(max_length=50, unique=True)
