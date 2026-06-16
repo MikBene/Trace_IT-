@@ -1,0 +1,134 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    border: none;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table-success {
+    background-color: #198754 !important;
+    color: white;
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+.alert {
+    border-radius: 8px;
+}
+
+.btn {
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+.img-fluid {
+    object-fit: cover;
+}
+
+#map {
+    border: 2px solid #198754;
+}
+
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1055;
+}
+
+.toast {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.toast.hiding {
+    animation: slideOut 0.5s ease-in forwards;
+}
+
+.btn-animated {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-animated:hover {
+    transform: scale(1.08);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.btn-animated:active {
+    transform: scale(0.92);
+}
+
+.card-animated {
+    transition: all 0.3s ease;
+}
+
+.card-animated:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+}
+
+.nav-link {
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+    transform: scale(1.05);
+}
+
+.badge-animated {
+    transition: all 0.2s ease;
+}
+
+.badge-animated:hover {
+    transform: scale(1.1);
+}
+
+.table-row-animated {
+    transition: all 0.2s ease;
+}
+
+.table-row-animated:hover {
+    transform: scale(1.01);
+    background-color: #f8f9fa;
+}
