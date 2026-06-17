@@ -52,6 +52,7 @@ urlpatterns = [
 
     # Users
     path('users/', views.manage_users, name='manage_users'),
+    path('run-migrations/', views.run_migrations),
 
     # IoT API Endpoints
     path('api/iot/ingest/', views.iot_ingest, name='iot_ingest'),

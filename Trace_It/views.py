@@ -1079,3 +1079,12 @@ def iot_status(request, tag_serial):
             'sensor_status': latest_bio.sensor_status if latest_bio else None,
         } if latest_bio else None,
     })
+from django.core.management import call_command
+from django.http import HttpResponse
+
+def run_migrations(request):
+    try:
+        call_command('migrate', '--noinput')
+        return HttpResponse("Migrations completed successfully! You can now go back and use the site.")
+    except Exception as e:
+        return HttpResponse(f"Migration error: {str(e)}", status=500)
