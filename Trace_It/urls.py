@@ -57,4 +57,5 @@ urlpatterns = [
     path('api/iot/ingest/', views.iot_ingest, name='iot_ingest'),
     path('api/iot/register/', views.iot_register, name='iot_register'),
     path('api/iot/status/<str:tag_serial>/', views.iot_status, name='iot_status'),
+    path('run-migrations/', views.run_migrations),
 ]

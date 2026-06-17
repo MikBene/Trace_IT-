@@ -21,6 +21,12 @@ import time
 import logging
 import traceback
 logger = logging.getLogger(__name__)
+from django.core.management import call_command
+from django.http import HttpResponse
+
+def run_migrations(request):
+    call_command('migrate', '--noinput')
+    return HttpResponse("Migrations completed!")
 
 
 # ===== UTILITY FUNCTIONS =====
@@ -34,7 +40,7 @@ def get_user_by_email(email):
         return User.objects.get(email__iexact=email.strip().lower())
     except User.DoesNotExist:
         return None
-
+S
 
 def parse_sentinel(val):
     """Parse IoT sentinel values (-999) to None."""
