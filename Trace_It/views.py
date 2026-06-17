@@ -21,12 +21,6 @@ import time
 import logging
 import traceback
 logger = logging.getLogger(__name__)
-from django.core.management import call_command
-from django.http import HttpResponse
-
-def run_migrations(request):
-    call_command('migrate', '--noinput')
-    return HttpResponse("Migrations completed!")
 
 
 # ===== UTILITY FUNCTIONS =====
@@ -40,7 +34,7 @@ def get_user_by_email(email):
         return User.objects.get(email__iexact=email.strip().lower())
     except User.DoesNotExist:
         return None
-S
+
 
 def parse_sentinel(val):
     """Parse IoT sentinel values (-999) to None."""
@@ -1079,12 +1073,3 @@ def iot_status(request, tag_serial):
             'sensor_status': latest_bio.sensor_status if latest_bio else None,
         } if latest_bio else None,
     })
-from django.core.management import call_command
-from django.http import HttpResponse
-
-def run_migrations(request):
-    try:
-        call_command('migrate', '--noinput')
-        return HttpResponse("Migrations completed successfully! You can now go back and use the site.")
-    except Exception as e:
-        return HttpResponse(f"Migration error: {str(e)}", status=500)
