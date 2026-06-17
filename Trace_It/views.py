@@ -758,9 +758,13 @@ def map_view(request):
 
     geofences = Geofence.objects.filter(is_active=True)
 
+    # Check if any demo geofences exist
+    demo_geofences = Geofence.objects.filter(name__startswith='Demo Fence').exists()
+
     context = {
         'locations_data': locations_data,
         'geofences': geofences,
+        'demo_geofences': demo_geofences,
     }
     return render(request, 'Trace_It/map_view.html', context)
 
@@ -1039,6 +1043,57 @@ def toggle_user_status(request, user_id):
         messages.error(request, f'Error: {str(e)}')
 
     return redirect('manage_users')
+
+
+@login_required
+@admin_required
+def setup_demo_geofences(request):
+    """Create 10-meter demo geofences around all animals for presentation testing.
+
+    This allows you to test geofence alerts by walking 10+ meters away from
+    the animal's current position (or a default demo center if no GPS yet).
+    """
+    animals = Animal.objects.all()
+    created_count = 0
+
+    # Default demo center (Queen Elizabeth National Park area)
+    default_lat = -0.4167
+    default_lon = 36.9500
+
+    for animal in animals:
+        loc = animal.get_latest_location()
+        if loc:
+            lat = float(loc.latitude)
+            lon = float(loc.longitude)
+        else:
+            # No location yet — use default center + small offset per animal
+            # so each animal gets a different demo geofence
+            lat = default_lat + (animal.animal_id * 0.0001)
+            lon = default_lon + (animal.animal_id * 0.0001)
+
+        fence_name = f"Demo Fence - {animal.nickname} (10m)"
+
+        # Check if demo fence already exists for this animal
+        existing = Geofence.objects.filter(name__startswith=f"Demo Fence - {animal.nickname}").first()
+        if not existing:
+            Geofence.objects.create(
+                name=fence_name,
+                description=f"Auto-created 10-meter demo geofence for {animal.nickname}. Walk 10+ meters away to trigger breach alert.",
+                center_latitude=lat,
+                center_longitude=lon,
+                radius_meters=10,
+                is_active=True,
+            )
+            created_count += 1
+            log_action(request.user, 'CREATE_DEMO_GEOFENCE', 
+                      f'Created 10m demo geofence for {animal.nickname} at ({lat}, {lon})')
+
+    if created_count > 0:
+        messages.success(request, f'Created {created_count} demo geofence(s) with 10-meter radius. Walk 10+ meters away from any animal to trigger a breach alert.')
+    else:
+        messages.info(request, 'Demo geofences already exist for all animals.')
+
+    return redirect('map_view')
 
 
 # ===== IoT API ENDPOINTS =====

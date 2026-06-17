@@ -31,6 +31,7 @@ urlpatterns = [
     path('users/create-ranger/', views.create_ranger, name='create_ranger'),
     path('users/toggle-role/<int:user_id>/', views.toggle_user_role, name='toggle_user_role'),
     path('users/toggle-status/<int:user_id>/', views.toggle_user_status, name='toggle_user_status'),
+    path('geofence/setup-demo/', views.setup_demo_geofences, name='setup_demo_geofences'),
     path('api/iot/ingest/', views.iot_ingest, name='iot_ingest'),
     path('api/iot/register/', views.iot_register, name='iot_register'),
     path('api/iot/status/<str:tag_serial>/', views.iot_status, name='iot_status'),
