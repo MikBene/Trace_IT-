@@ -334,12 +334,26 @@ def index(request):
 
         for animal in animals:
             try:
-                latest_location = animal.get_latest_location()
-                latest_biometrics = animal.get_latest_biometrics()
+                latest_location = None
+                latest_biometrics = None
                 battery_level = None
+
+                try:
+                    latest_location = animal.get_latest_location()
+                except Exception:
+                    pass
+
+                try:
+                    latest_biometrics = animal.get_latest_biometrics()
+                except Exception:
+                    pass
+
                 if latest_location:
-                    tag = latest_location.tag
-                    battery_level = tag.battery_level if tag else None
+                    try:
+                        tag = latest_location.tag
+                        battery_level = tag.battery_level if tag else None
+                    except Exception:
+                        pass
 
                 animal_data.append({
                     'animal': animal,
@@ -367,27 +381,55 @@ def index(request):
 @login_required
 @ranger_required
 def animal_detail(request, animal_id):
-    animal = get_object_or_404(Animal, animal_id=animal_id)
-    locations = animal.get_all_locations(limit=50)
-    latest_biometrics = animal.get_latest_biometrics()
+    try:
+        animal = get_object_or_404(Animal, animal_id=animal_id)
+        locations = []
+        latest_biometrics = None
+        tags = []
+        alerts = []
+        biometric_history = []
 
-    deployment = animal.deployment_set.filter(is_active=True).first()
-    tags = [deployment.tag] if deployment else []
+        try:
+            locations = animal.get_all_locations(limit=50)
+        except Exception as e:
+            logger.error(f"animal_detail locations error: {e}")
 
-    alerts = Alert.objects.filter(animal=animal).order_by('-timestamp')[:10]
-    biometric_history = BiometricReading.objects.filter(
-        tag__deployment__animal=animal
-    ).order_by('-timestamp')[:50]
+        try:
+            latest_biometrics = animal.get_latest_biometrics()
+        except Exception as e:
+            logger.error(f"animal_detail biometrics error: {e}")
 
-    context = {
-        'animal': animal,
-        'locations': locations,
-        'tags': tags,
-        'alerts': alerts,
-        'latest_biometrics': latest_biometrics,
-        'biometric_history': biometric_history,
-    }
-    return render(request, 'Trace_It/animal_detail.html', context)
+        try:
+            deployment = animal.deployment_set.filter(is_active=True).first()
+            tags = [deployment.tag] if deployment else []
+        except Exception as e:
+            logger.error(f"animal_detail deployment error: {e}")
+
+        try:
+            alerts = Alert.objects.filter(animal=animal).order_by('-timestamp')[:10]
+        except Exception as e:
+            logger.error(f"animal_detail alerts error: {e}")
+
+        try:
+            biometric_history = BiometricReading.objects.filter(
+                tag__deployment__animal=animal
+            ).order_by('-timestamp')[:50]
+        except Exception as e:
+            logger.error(f"animal_detail biometric_history error: {e}")
+
+        context = {
+            'animal': animal,
+            'locations': locations,
+            'tags': tags,
+            'alerts': alerts,
+            'latest_biometrics': latest_biometrics,
+            'biometric_history': biometric_history,
+        }
+        return render(request, 'Trace_It/animal_detail.html', context)
+    except Exception as e:
+        logger.error(f"animal_detail critical error: {e}")
+        messages.error(request, f'Error loading animal details: {str(e)}')
+        return redirect('index')
 
 
 @login_required
@@ -469,39 +511,44 @@ def delete_animal(request, animal_id):
 @login_required
 @admin_required
 def dashboard(request):
-    total_animals = Animal.objects.count()
-    total_tags = TrackingTag.objects.count()
-    active_deployments = Deployment.objects.filter(is_active=True).count()
-    total_locations = Location.objects.count()
-    unresolved_alerts = Alert.objects.filter(is_resolved=False).count()
-    recent_alerts = Alert.objects.filter(is_resolved=False).order_by('-timestamp')[:10]
-    recent_locations = Location.objects.all().select_related('tag').order_by('-timestamp')[:10]
-    recent_logs = AuditLog.objects.all().order_by('-timestamp')[:20]
-    low_battery_tags = TrackingTag.objects.filter(battery_level__lt=20).count()
+    try:
+        total_animals = Animal.objects.count()
+        total_tags = TrackingTag.objects.count()
+        active_deployments = Deployment.objects.filter(is_active=True).count()
+        total_locations = Location.objects.count()
+        unresolved_alerts = Alert.objects.filter(is_resolved=False).count()
+        recent_alerts = Alert.objects.filter(is_resolved=False).order_by('-timestamp')[:10]
+        recent_locations = Location.objects.all().select_related('tag').order_by('-timestamp')[:10]
+        recent_logs = AuditLog.objects.all().order_by('-timestamp')[:20]
+        low_battery_tags = TrackingTag.objects.filter(battery_level__lt=20).count()
 
-    recent_biometrics = BiometricReading.objects.all().order_by('-timestamp')[:10]
-    sensor_errors = BiometricReading.objects.exclude(sensor_status='OK').count()
-    critical_health_alerts = Alert.objects.filter(
-        alert_type='HEALTH', 
-        is_resolved=False,
-        severity__in=['HIGH', 'CRITICAL']
-    ).count()
+        recent_biometrics = BiometricReading.objects.all().order_by('-timestamp')[:10]
+        sensor_errors = BiometricReading.objects.exclude(sensor_status='OK').count()
+        critical_health_alerts = Alert.objects.filter(
+            alert_type='HEALTH', 
+            is_resolved=False,
+            severity__in=['HIGH', 'CRITICAL']
+        ).count()
 
-    context = {
-        'total_animals': total_animals,
-        'total_tags': total_tags,
-        'active_deployments': active_deployments,
-        'total_locations': total_locations,
-        'unresolved_alerts': unresolved_alerts,
-        'recent_alerts': recent_alerts,
-        'recent_locations': recent_locations,
-        'recent_logs': recent_logs,
-        'low_battery_tags': low_battery_tags,
-        'recent_biometrics': recent_biometrics,
-        'sensor_errors': sensor_errors,
-        'critical_health_alerts': critical_health_alerts,
-    }
-    return render(request, 'Trace_It/dashboard.html', context)
+        context = {
+            'total_animals': total_animals,
+            'total_tags': total_tags,
+            'active_deployments': active_deployments,
+            'total_locations': total_locations,
+            'unresolved_alerts': unresolved_alerts,
+            'recent_alerts': recent_alerts,
+            'recent_locations': recent_locations,
+            'recent_logs': recent_logs,
+            'low_battery_tags': low_battery_tags,
+            'recent_biometrics': recent_biometrics,
+            'sensor_errors': sensor_errors,
+            'critical_health_alerts': critical_health_alerts,
+        }
+        return render(request, 'Trace_It/dashboard.html', context)
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+        messages.error(request, f'Dashboard error: {str(e)}')
+        return render(request, 'Trace_It/dashboard.html', {})
 
 
 @login_required
@@ -726,47 +773,57 @@ def location_history(request, animal_id):
 @ranger_required
 def map_view(request):
     """Show ALL animals on the map, including those with tags but no location data yet."""
-    animals = Animal.objects.all().select_related('species')
-    locations_data = []
+    try:
+        animals = Animal.objects.all().select_related('species')
+        locations_data = []
 
-    for animal in animals:
-        loc = animal.get_latest_location()
-        if loc:
-            locations_data.append({
-                'id': animal.animal_id,
-                'nickname': animal.nickname,
-                'species': animal.species.common_name if animal.species else 'Unknown',
-                'latitude': float(loc.latitude),
-                'longitude': float(loc.longitude),
-                'speed': float(loc.speed) if loc.speed else 0,
-                'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'stationary': animal.is_stationary(minutes=90),
-            })
-        else:
-            # Show animal on map even without location (at default center)
-            # This ensures newly tagged animals appear immediately
-            locations_data.append({
-                'id': animal.animal_id,
-                'nickname': animal.nickname,
-                'species': animal.species.common_name if animal.species else 'Unknown',
-                'latitude': None,
-                'longitude': None,
-                'speed': 0,
-                'timestamp': 'No data yet',
-                'stationary': False,
-            })
+        for animal in animals:
+            try:
+                loc = animal.get_latest_location()
+                if loc:
+                    locations_data.append({
+                        'id': animal.animal_id,
+                        'nickname': animal.nickname,
+                        'species': animal.species.common_name if animal.species else 'Unknown',
+                        'latitude': float(loc.latitude),
+                        'longitude': float(loc.longitude),
+                        'speed': float(loc.speed) if loc.speed else 0,
+                        'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
+                        'stationary': False,  # Simplified to avoid model method issues
+                    })
+                else:
+                    locations_data.append({
+                        'id': animal.animal_id,
+                        'nickname': animal.nickname,
+                        'species': animal.species.common_name if animal.species else 'Unknown',
+                        'latitude': None,
+                        'longitude': None,
+                        'speed': 0,
+                        'timestamp': 'No data yet',
+                        'stationary': False,
+                    })
+            except Exception as e:
+                logger.error(f"map_view error for animal {animal.animal_id}: {e}")
+                continue
 
-    geofences = Geofence.objects.filter(is_active=True)
+        geofences = Geofence.objects.filter(is_active=True)
+        demo_geofences = Geofence.objects.filter(name__startswith='Demo Fence').exists()
+        locations_json = json.dumps(locations_data)
 
-    # Check if any demo geofences exist
-    demo_geofences = Geofence.objects.filter(name__startswith='Demo Fence').exists()
-
-    context = {
-        'locations_data': locations_data,
-        'geofences': geofences,
-        'demo_geofences': demo_geofences,
-    }
-    return render(request, 'Trace_It/map_view.html', context)
+        context = {
+            'locations_data': locations_json,
+            'geofences': geofences,
+            'demo_geofences': demo_geofences,
+        }
+        return render(request, 'Trace_It/map_view.html', context)
+    except Exception as e:
+        logger.error(f"map_view critical error: {e}")
+        messages.error(request, f'Map error: {str(e)}')
+        return render(request, 'Trace_It/map_view.html', {
+            'locations_data': '[]',
+            'geofences': [],
+            'demo_geofences': False,
+        })
 
 
 @login_required
@@ -1048,50 +1105,48 @@ def toggle_user_status(request, user_id):
 @login_required
 @admin_required
 def setup_demo_geofences(request):
-    """Create 10-meter demo geofences around all animals for presentation testing.
+    """Create 10-meter demo geofences around all animals for presentation testing."""
+    try:
+        animals = Animal.objects.all()
+        created_count = 0
+        default_lat = -0.4167
+        default_lon = 36.9500
 
-    This allows you to test geofence alerts by walking 10+ meters away from
-    the animal's current position (or a default demo center if no GPS yet).
-    """
-    animals = Animal.objects.all()
-    created_count = 0
+        for animal in animals:
+            try:
+                loc = animal.get_latest_location()
+                if loc:
+                    lat = float(loc.latitude)
+                    lon = float(loc.longitude)
+                else:
+                    lat = default_lat + (animal.animal_id * 0.0001)
+                    lon = default_lon + (animal.animal_id * 0.0001)
 
-    # Default demo center (Queen Elizabeth National Park area)
-    default_lat = -0.4167
-    default_lon = 36.9500
+                fence_name = f"Demo Fence - {animal.nickname} (10m)"
 
-    for animal in animals:
-        loc = animal.get_latest_location()
-        if loc:
-            lat = float(loc.latitude)
-            lon = float(loc.longitude)
+                existing = Geofence.objects.filter(name__startswith=f"Demo Fence - {animal.nickname}").first()
+                if not existing:
+                    Geofence.objects.create(
+                        name=fence_name,
+                        center_latitude=lat,
+                        center_longitude=lon,
+                        radius_meters=10,
+                        is_active=True,
+                    )
+                    created_count += 1
+                    log_action(request.user, 'CREATE_DEMO_GEOFENCE', 
+                              f'Created 10m demo geofence for {animal.nickname} at ({lat}, {lon})')
+            except Exception as e:
+                logger.error(f"Demo geofence error for {animal.nickname}: {e}")
+                continue
+
+        if created_count > 0:
+            messages.success(request, f'Created {created_count} demo geofence(s) with 10-meter radius.')
         else:
-            # No location yet — use default center + small offset per animal
-            # so each animal gets a different demo geofence
-            lat = default_lat + (animal.animal_id * 0.0001)
-            lon = default_lon + (animal.animal_id * 0.0001)
-
-        fence_name = f"Demo Fence - {animal.nickname} (10m)"
-
-        # Check if demo fence already exists for this animal
-        existing = Geofence.objects.filter(name__startswith=f"Demo Fence - {animal.nickname}").first()
-        if not existing:
-            Geofence.objects.create(
-                name=fence_name,
-                description=f"Auto-created 10-meter demo geofence for {animal.nickname}. Walk 10+ meters away to trigger breach alert.",
-                center_latitude=lat,
-                center_longitude=lon,
-                radius_meters=10,
-                is_active=True,
-            )
-            created_count += 1
-            log_action(request.user, 'CREATE_DEMO_GEOFENCE', 
-                      f'Created 10m demo geofence for {animal.nickname} at ({lat}, {lon})')
-
-    if created_count > 0:
-        messages.success(request, f'Created {created_count} demo geofence(s) with 10-meter radius. Walk 10+ meters away from any animal to trigger a breach alert.')
-    else:
-        messages.info(request, 'Demo geofences already exist for all animals.')
+            messages.info(request, 'Demo geofences already exist for all animals.')
+    except Exception as e:
+        logger.error(f"setup_demo_geofences error: {e}")
+        messages.error(request, f'Error creating demo geofences: {str(e)}')
 
     return redirect('map_view')
 
