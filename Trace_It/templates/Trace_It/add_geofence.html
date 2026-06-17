@@ -19,13 +19,4 @@
         </div>
     </div>
 </div>
-{% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-success btn-animated">Save Geofence</button>
-                    <a href="{% url 'map_view' %}" class="btn btn-outline-secondary btn-animated">Cancel</a>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}

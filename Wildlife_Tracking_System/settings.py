@@ -7,24 +7,16 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-CHANGE-THIS-IN-PRODUCTION-abcdefghijklmnopqrstuvwxyz123456789')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# TEMPORARILY SET TO True so you can see the yellow error page
-# Change back to False after fixing the errors
+# Set to True to see errors during debugging
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-# CSRF trusted origins for Railway deployment
 CSRF_TRUSTED_ORIGINS = [
     'https://web-production-050c1a.up.railway.app',
     'http://web-production-050c1a.up.railway.app',
-    'https://*.railway.app',
-    'http://*.railway.app',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
 ]
 
 INSTALLED_APPS = [
@@ -69,7 +61,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Wildlife_Tracking_System.wsgi.application'
 
-# Database - Railway provides DATABASE_URL env var, fallback to SQLite
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
@@ -96,12 +87,9 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-
-# Whitenoise storage - use simple storage to avoid manifest issues
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

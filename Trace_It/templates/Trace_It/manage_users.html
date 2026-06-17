@@ -26,38 +26,110 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for profile in users %}
+                    {% for user in users %}
                     <tr class="table-row-animated">
-                        <td>{{ profile.user.username }}</td>
+                        <td>{{ user.username }}</td>
                         <td>
-                            <span class="badge bg-{% if profile.role == 'ADMIN' %}danger{% else %}success{% endif %} badge-animated">
-                                {{ profile.role }}
+                            <span class="badge bg-{% if user.userprofile.role == 'ADMIN' %}danger{% else %}success{% endif %} badge-animated">
+                                {{ user.userprofile.role }}
                             </span>
                         </td>
-                        <td>{{ profile.user.first_name }} {{ profile.user.last_name }}</td>
-                        <td>{{ profile.user.email }}</td>
-                        <td>{{ profile.phone|default:"-" }}</td>
+                        <td>{{ user.first_name }} {{ user.last_name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.userprofile.phone|default:"-" }}</td>
                         <td>
-                            {% if profile.user.is_active %}
+                            {% if user.is_active %}
                                 <span class="badge bg-success badge-animated">Active</span>
                             {% else %}
                                 <span class="badge bg-secondary badge-animated">Inactive</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if profile.role == 'RANGER' %}
-                                <form method="post" action="{% url 'toggle_user_status' profile.user.id %}" class="d-inline">
+                            <div class="d-flex gap-2">
+                                <!-- Edit Button -->
+                                <button type="button" class="btn btn-sm btn-primary btn-animated" 
+                                        data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+
+                                <!-- Change Role -->
+                                <form method="post" action="{% url 'toggle_user_role' user.id %}" class="d-inline">
                                     {% csrf_token %}
-                                    {% if profile.user.is_active %}
-                                        <button type="submit" class="btn btn-sm btn-warning btn-animated">Deactivate</button>
-                                    {% else %}
-                                        <button type="submit" class="btn btn-sm btn-success btn-animated">Activate</button>
-                                    {% endif %}
+                                    <button type="submit" class="btn btn-sm btn-warning btn-animated" 
+                                            onclick="return confirm('Change {{ user.email }} from {{ user.userprofile.role }} to {% if user.userprofile.role == 'ADMIN' %}RANGER{% else %}ADMIN{% endif %}?')">
+                                        <i class="bi bi-arrow-left-right"></i> Role
+                                    </button>
                                 </form>
-                            {% else %}
-                                <span class="text-muted">Admin</span>
-                            {% endif %}
+
+                                <!-- Delete -->
+                                <form method="post" action="{% url 'toggle_user_status' user.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger btn-animated" 
+                                            onclick="return confirm('Are you sure you want to DELETE {{ user.email }}? This action cannot be undone.')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </form>
+                            </div>
                         </td>
+                    </tr>
+
+                    <!-- Edit Modal for this user -->
+                    <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit User: {{ user.get_full_name|default:user.email }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form method="post" action="{% url 'manage_users' %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="edit_ranger">
+                                        <input type="hidden" name="user_id" value="{{ user.id }}">
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                                            <input type="email" name="email" class="form-control" required value="{{ user.email }}">
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">First Name</label>
+                                                <input type="text" name="first_name" class="form-control" value="{{ user.first_name|default:'' }}">
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Last Name</label>
+                                                <input type="text" name="last_name" class="form-control" value="{{ user.last_name|default:'' }}">
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Phone Number</label>
+                                            <input type="tel" name="phone" class="form-control" value="{{ user.userprofile.phone|default:'' }}">
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">New Password</label>
+                                            <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
+                                            <div class="form-text">Only fill this if you want to change the password</div>
+                                        </div>
+
+                                        <div class="d-flex gap-2 mt-4">
+                                            <button type="submit" class="btn btn-primary flex-fill">
+                                                <i class="bi bi-save me-2"></i>Save Changes
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">No users found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

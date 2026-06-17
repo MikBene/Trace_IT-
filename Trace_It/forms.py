@@ -1,8 +1,7 @@
 from django import forms
 from django.db import models
 from django.utils import timezone
-from .models import Animal, Species, TrackingTag, Geofence, Deployment
-import traceback
+from .models import Animal, Species, TrackingTag, Deployment
 
 
 class AnimalForm(forms.ModelForm):
@@ -37,7 +36,6 @@ class AnimalForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # ESP32 Tag selection - queryset set in __init__ to avoid AppRegistryNotReady
     esp32_tag = forms.ModelChoiceField(
         queryset=TrackingTag.objects.none(),
         required=False,
@@ -62,10 +60,8 @@ class AnimalForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         try:
-            # Set queryset here instead of at class level to avoid AppRegistryNotReady
             self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
 
-            # If editing, set initial values from existing instance
             if self.instance and self.instance.pk:
                 if hasattr(self.instance, 'species') and self.instance.species:
                     self.fields['species_name'].initial = self.instance.species.common_name
@@ -76,8 +72,8 @@ class AnimalForm(forms.ModelForm):
                     if deployment and deployment.tag:
                         current_tag_id = deployment.tag_id
                         self.fields['esp32_tag'].initial = deployment.tag
-                except Exception as e:
-                    print(f"Warning: Could not load deployment: {e}")
+                except Exception:
+                    pass
 
                 if current_tag_id:
                     self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(
@@ -85,9 +81,8 @@ class AnimalForm(forms.ModelForm):
                     )
                 else:
                     self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
-        except Exception as e:
-            print(f"ERROR in AnimalForm.__init__: {e}")
-            traceback.print_exc()
+        except Exception:
+            pass
 
     def clean(self):
         cleaned_data = super().clean()
@@ -99,59 +94,60 @@ class AnimalForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
-        try:
-            species_name = self.cleaned_data.get('species_name')
-            esp32_tag = self.cleaned_data.get('esp32_tag')
+        species_name = self.cleaned_data.get('species_name')
+        esp32_tag = self.cleaned_data.get('esp32_tag')
 
-            species_map = {
-                'Lion': 'Panthera leo',
-                'Elephant': 'Loxodonta africana',
-                'Giraffe': 'Giraffa camelopardalis',
-                'Zebra': 'Equus quagga',
-            }
+        species_map = {
+            'Lion': 'Panthera leo',
+            'Elephant': 'Loxodonta africana',
+            'Giraffe': 'Giraffa camelopardalis',
+            'Zebra': 'Equus quagga',
+        }
 
-            if species_name:
-                species_obj, created = Species.objects.get_or_create(
-                    common_name=species_name,
-                    defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
+        if species_name:
+            species_obj, created = Species.objects.get_or_create(
+                common_name=species_name,
+                defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
+            )
+            self.instance.species = species_obj
+
+        instance = super().save(commit=commit)
+
+        if esp32_tag:
+            existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
+            if not existing:
+                # Deactivate any other active deployment for this tag
+                Deployment.objects.filter(tag=esp32_tag, is_active=True).exclude(animal=instance).update(
+                    is_active=False,
+                    end_date=timezone.now()
                 )
-                self.instance.species = species_obj
 
-            instance = super().save(commit=commit)
-
-            if esp32_tag:
-                existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
-                if not existing:
-                    Deployment.objects.filter(tag=esp32_tag, is_active=True).exclude(animal=instance).update(
-                        is_active=False, 
-                        end_date=timezone.now()
-                    )
-
-                    old_deployments = Deployment.objects.filter(animal=instance, is_active=True).exclude(tag=esp32_tag)
-                    for dep in old_deployments:
-                        dep.is_active = False
-                        dep.end_date = timezone.now()
-                        dep.save()
-                        dep.tag.is_assigned = False
-                        dep.tag.save()
-
-                    Deployment.objects.create(animal=instance, tag=esp32_tag, is_active=True)
-                    esp32_tag.is_assigned = True
-                    esp32_tag.save()
-            else:
-                old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
+                # Deactivate old deployments for this animal
+                old_deployments = Deployment.objects.filter(animal=instance, is_active=True).exclude(tag=esp32_tag)
                 for dep in old_deployments:
                     dep.is_active = False
                     dep.end_date = timezone.now()
                     dep.save()
+                    if dep.tag:
+                        dep.tag.is_assigned = False
+                        dep.tag.save()
+
+                # Create new deployment
+                Deployment.objects.create(animal=instance, tag=esp32_tag, is_active=True)
+                esp32_tag.is_assigned = True
+                esp32_tag.save()
+        else:
+            # No tag selected — deactivate all active deployments for this animal
+            old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
+            for dep in old_deployments:
+                dep.is_active = False
+                dep.end_date = timezone.now()
+                dep.save()
+                if dep.tag:
                     dep.tag.is_assigned = False
                     dep.tag.save()
 
-            return instance
-        except Exception as e:
-            print(f"ERROR in AnimalForm.save: {e}")
-            traceback.print_exc()
-            raise
+        return instance
 
 
 class TrackingTagForm(forms.ModelForm):

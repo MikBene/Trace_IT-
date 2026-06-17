@@ -2,31 +2,31 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponse, StreamingHttpResponse
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from django.db import models
-from .models import Animal, Species, TrackingTag, Deployment, Location, Alert, Geofence, UserProfile, AuditLog, WeatherData, BiometricReading
+from django.db import models, transaction
+from .models import Animal, Species, TrackingTag, Deployment, Location, Alert, Geofence, UserProfile, AuditLog, BiometricReading
 from .forms import AnimalForm, TrackingTagForm, GeofenceForm
-import random
-import math
 import csv
-import requests
 import json
-import time
 import logging
 import traceback
+
 logger = logging.getLogger(__name__)
 
 
 # ===== UTILITY FUNCTIONS =====
 
 def log_action(user, action, details):
-    AuditLog.objects.create(user=user, action=action, details=details)
+    try:
+        AuditLog.objects.create(user=user, action=action, details=details)
+    except Exception:
+        pass
 
 
 def get_user_by_email(email):
@@ -200,7 +200,6 @@ def check_geofence_violations(animal, location):
 
 def check_stationary_alert(animal):
     if animal.is_stationary(minutes=90):
-        latest = animal.get_latest_location()
         Alert.objects.get_or_create(
             animal=animal,
             alert_type='STATIONARY',
@@ -330,7 +329,7 @@ def logout_view(request):
 @login_required
 def index(request):
     try:
-        animals = Animal.objects.all()
+        animals = Animal.objects.all().select_related('species')
         animal_data = []
 
         for animal in animals:
@@ -347,12 +346,11 @@ def index(request):
                     'latest_location': latest_location,
                     'latest_biometrics': latest_biometrics,
                     'battery_level': battery_level,
-                    'status': 'Active' if animal.get_latest_location() else 'Inactive',
+                    'status': 'Active' if latest_location else 'Inactive',
                     'health_status': animal.health_status,
                 })
             except Exception as e:
-                print(f"ERROR processing animal {animal.animal_id}: {e}")
-                traceback.print_exc()
+                logger.error(f"Error processing animal {animal.animal_id}: {e}")
                 continue
 
         context = {
@@ -361,9 +359,9 @@ def index(request):
         }
         return render(request, 'Trace_It/index.html', context)
     except Exception as e:
-        print(f"ERROR in index view: {e}")
-        traceback.print_exc()
-        raise
+        logger.error(f"Error in index view: {e}")
+        messages.error(request, 'An error occurred loading the animal list.')
+        return render(request, 'Trace_It/index.html', {'animal_data': [], 'total_animals': 0})
 
 
 @login_required
@@ -399,12 +397,14 @@ def add_animal(request):
         form = AnimalForm(request.POST, user=request.user)
         if form.is_valid():
             try:
-                animal = form.save()
+                with transaction.atomic():
+                    animal = form.save()
                 log_action(request.user, 'CREATE_ANIMAL', f'Added animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" added successfully.')
                 return redirect('index')
             except Exception as e:
-                messages.error(request, f'Error saving: {str(e)}')
+                logger.error(f"Error saving animal: {e}")
+                messages.error(request, f'Error saving animal: {str(e)}')
         else:
             messages.error(request, 'Please fix the errors below.')
     else:
@@ -422,17 +422,16 @@ def edit_animal(request, animal_id):
         form = AnimalForm(request.POST, instance=animal, user=request.user)
         if form.is_valid():
             try:
-                animal = form.save()
+                with transaction.atomic():
+                    animal = form.save()
                 log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
                 return redirect('index')
             except Exception as e:
-                import traceback
-                print(f"SAVE ERROR: {e}")
-                traceback.print_exc()
+                logger.error(f"SAVE ERROR: {e}")
                 messages.error(request, f'Error saving: {str(e)}')
         else:
-            print(f"FORM ERRORS: {form.errors}")
+            logger.error(f"FORM ERRORS: {form.errors}")
             messages.error(request, 'Please fix the errors below.')
     else:
         form = AnimalForm(instance=animal, user=request.user)
@@ -459,9 +458,7 @@ def delete_animal(request, animal_id):
             log_action(request.user, 'DELETE_ANIMAL', f'Deleted {nickname} (ID: {animal_id})')
             messages.success(request, f'Animal "{nickname}" deleted successfully.')
         except Exception as e:
-            import traceback
-            print(f"DELETE ERROR: {e}")
-            traceback.print_exc()
+            logger.error(f"DELETE ERROR: {e}")
             messages.error(request, f'Could not delete: {str(e)}')
 
         return redirect('index')
@@ -728,21 +725,41 @@ def location_history(request, animal_id):
 @login_required
 @ranger_required
 def map_view(request):
-    active_animals = Animal.objects.all()
-    animal_locations = []
+    """Show ALL animals on the map, including those with tags but no location data yet."""
+    animals = Animal.objects.all().select_related('species')
+    locations_data = []
 
-    for animal in active_animals:
+    for animal in animals:
         loc = animal.get_latest_location()
         if loc:
-            animal_locations.append({
-                'animal': animal,
-                'location': loc,
+            locations_data.append({
+                'id': animal.animal_id,
+                'nickname': animal.nickname,
+                'species': animal.species.common_name if animal.species else 'Unknown',
+                'latitude': float(loc.latitude),
+                'longitude': float(loc.longitude),
+                'speed': float(loc.speed) if loc.speed else 0,
+                'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'stationary': animal.is_stationary(minutes=90),
+            })
+        else:
+            # Show animal on map even without location (at default center)
+            # This ensures newly tagged animals appear immediately
+            locations_data.append({
+                'id': animal.animal_id,
+                'nickname': animal.nickname,
+                'species': animal.species.common_name if animal.species else 'Unknown',
+                'latitude': None,
+                'longitude': None,
+                'speed': 0,
+                'timestamp': 'No data yet',
+                'stationary': False,
             })
 
     geofences = Geofence.objects.filter(is_active=True)
 
     context = {
-        'animal_locations': animal_locations,
+        'locations_data': locations_data,
         'geofences': geofences,
     }
     return render(request, 'Trace_It/map_view.html', context)
@@ -786,9 +803,9 @@ def export_alerts_csv(request):
     writer = csv.writer(response)
     writer.writerow(['Animal', 'Alert Type', 'Message', 'Created At', 'Resolved', 'Resolved By', 'Resolved At'])
 
-    alerts = Alert.objects.all().select_related('animal', 'resolved_by').order_by('-timestamp')
+    alerts_qs = Alert.objects.all().select_related('animal', 'resolved_by').order_by('-timestamp')
 
-    for alert in alerts:
+    for alert in alerts_qs:
         writer.writerow([
             alert.animal.nickname if alert.animal else 'N/A',
             alert.alert_type,
@@ -826,104 +843,202 @@ def audit_log(request):
 @login_required
 @admin_required
 def manage_users(request):
-    if request.method == 'POST' and request.POST.get('action') == 'edit_ranger':
-        user_id = request.POST.get('user_id')
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                profile = user.userprofile
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
 
-                user_role = profile.role
-                role_label = 'Admin' if user_role == 'ADMIN' else 'Ranger'
+        if action == 'edit_ranger':
+            user_id = request.POST.get('user_id')
+            if user_id:
+                try:
+                    user = User.objects.get(id=user_id)
+                    profile = user.userprofile
 
-                email = request.POST.get('email', '').strip().lower()
-                first_name = request.POST.get('first_name', '').strip()
-                last_name = request.POST.get('last_name', '').strip()
-                phone = request.POST.get('phone', '').strip()
-                new_password = request.POST.get('password', '')
+                    email = request.POST.get('email', '').strip().lower()
+                    first_name = request.POST.get('first_name', '').strip()
+                    last_name = request.POST.get('last_name', '').strip()
+                    phone = request.POST.get('phone', '').strip()
+                    new_password = request.POST.get('password', '')
 
-                if not email:
-                    messages.error(request, f"Email is required for {role_label.lower()} {user.email}.")
-                elif '@' not in email or '.' not in email.split('@')[-1]:
-                    messages.error(request, f"Please enter a valid email address for {role_label.lower()} {user.email}.")
-                elif email != user.email and User.objects.filter(email__iexact=email).exists():
-                    messages.error(request, f"A user with email '{email}' already exists.")
-                else:
-                    old_email = user.email
-                    user.email = email
-                    user.username = email
-                    user.first_name = first_name
-                    user.last_name = last_name
-                    user.save()
-
-                    profile.phone = phone
-                    profile.save()
-
-                    if new_password and len(new_password) >= 6:
-                        user.set_password(new_password)
+                    if not email:
+                        messages.error(request, "Email is required.")
+                    elif '@' not in email or '.' not in email.split('@')[-1]:
+                        messages.error(request, "Please enter a valid email address.")
+                    elif email != user.email and User.objects.filter(email__iexact=email).exists():
+                        messages.error(request, f"A user with email '{email}' already exists.")
+                    else:
+                        old_email = user.email
+                        user.email = email
+                        user.username = email
+                        user.first_name = first_name
+                        user.last_name = last_name
                         user.save()
-                        messages.info(request, f"Password for {role_label} {email} updated successfully.")
 
-                    log_action(request.user, 'UPDATE_USER', f'Updated {role_label.lower()} {old_email} -> {email}')
-                    messages.success(request, f'{role_label} {email} updated successfully!')
+                        profile.phone = phone
+                        profile.save()
 
-            except User.DoesNotExist:
-                messages.error(request, "User not found.")
-            except Exception as e:
-                messages.error(request, f'Error updating user: {str(e)}')
+                        if new_password and len(new_password) >= 6:
+                            user.set_password(new_password)
+                            user.save()
+                            messages.info(request, f"Password for {email} updated successfully.")
 
-        return redirect('manage_users')
+                        log_action(request.user, 'UPDATE_USER', f'Updated {old_email} -> {email}')
+                        messages.success(request, f'{email} updated successfully!')
 
-    if request.method == 'POST' and request.POST.get('action') == 'change_role':
-        user_id = request.POST.get('user_id')
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                profile = user.userprofile
-                old_role = profile.role
-                new_role = request.POST.get('role')
+                except User.DoesNotExist:
+                    messages.error(request, "User not found.")
+                except Exception as e:
+                    messages.error(request, f'Error updating user: {str(e)}')
 
-                if new_role in ['ADMIN', 'RANGER']:
-                    profile.role = new_role
-                    profile.save()
+            return redirect('manage_users')
 
-                    old_label = 'Admin' if old_role == 'ADMIN' else 'Ranger'
-                    new_label = 'Admin' if new_role == 'ADMIN' else 'Ranger'
+        elif action == 'change_role':
+            user_id = request.POST.get('user_id')
+            if user_id:
+                try:
+                    user = User.objects.get(id=user_id)
+                    profile = user.userprofile
+                    old_role = profile.role
+                    new_role = request.POST.get('role')
 
-                    log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
-                    messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
+                    if new_role in ['ADMIN', 'RANGER']:
+                        profile.role = new_role
+                        profile.save()
 
-            except User.DoesNotExist:
-                messages.error(request, "User not found.")
-            except Exception as e:
-                messages.error(request, f'Error changing role: {str(e)}')
+                        old_label = 'Admin' if old_role == 'ADMIN' else 'Ranger'
+                        new_label = 'Admin' if new_role == 'ADMIN' else 'Ranger'
 
-        return redirect('manage_users')
+                        log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
+                        messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
 
-    if request.method == 'POST' and request.POST.get('action') == 'delete_user':
-        user_id = request.POST.get('user_id')
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                if user == request.user:
-                    messages.error(request, "You cannot delete your own account.")
-                else:
-                    email = user.email
-                    user.delete()
-                    log_action(request.user, 'DELETE_USER', f'Deleted user {email}')
-                    messages.success(request, f'User {email} deleted successfully.')
-            except User.DoesNotExist:
-                messages.error(request, "User not found.")
-            except Exception as e:
-                messages.error(request, f'Error deleting user: {str(e)}')
+                except User.DoesNotExist:
+                    messages.error(request, "User not found.")
+                except Exception as e:
+                    messages.error(request, f'Error changing role: {str(e)}')
 
-        return redirect('manage_users')
+            return redirect('manage_users')
+
+        elif action == 'delete_user':
+            user_id = request.POST.get('user_id')
+            if user_id:
+                try:
+                    user = User.objects.get(id=user_id)
+                    if user == request.user:
+                        messages.error(request, "You cannot delete your own account.")
+                    else:
+                        email = user.email
+                        user.delete()
+                        log_action(request.user, 'DELETE_USER', f'Deleted user {email}')
+                        messages.success(request, f'User {email} deleted successfully.')
+                except User.DoesNotExist:
+                    messages.error(request, "User not found.")
+                except Exception as e:
+                    messages.error(request, f'Error deleting user: {str(e)}')
+
+            return redirect('manage_users')
 
     users = User.objects.all().select_related('userprofile').order_by('email')
     context = {
         'users': users,
     }
     return render(request, 'Trace_It/manage_users.html', context)
+
+
+@login_required
+@admin_required
+def create_ranger(request):
+    """Create a new ranger account."""
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '')
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+
+        if not email or not password:
+            messages.error(request, 'Email and password are required.')
+            return redirect('manage_users')
+
+        if '@' not in email or '.' not in email.split('@')[-1]:
+            messages.error(request, 'Please enter a valid email address.')
+            return redirect('manage_users')
+
+        if User.objects.filter(email__iexact=email).exists():
+            messages.error(request, f'A user with email "{email}" already exists.')
+            return redirect('manage_users')
+
+        if len(password) < 6:
+            messages.error(request, 'Password must be at least 6 characters.')
+            return redirect('manage_users')
+
+        try:
+            user = User.objects.create(
+                username=email,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                password=make_password(password),
+            )
+            UserProfile.objects.create(
+                user=user,
+                role='RANGER',
+                phone=phone,
+            )
+            log_action(request.user, 'CREATE_RANGER', f'Created ranger account {email}')
+            messages.success(request, f'Ranger "{email}" created successfully!')
+        except Exception as e:
+            messages.error(request, f'Error creating ranger: {str(e)}')
+
+        return redirect('manage_users')
+
+    return redirect('manage_users')
+
+
+@login_required
+@admin_required
+def toggle_user_role(request, user_id):
+    """Toggle a user's role between ADMIN and RANGER."""
+    try:
+        user = User.objects.get(id=user_id)
+        profile = user.userprofile
+        old_role = profile.role
+        new_role = 'RANGER' if old_role == 'ADMIN' else 'ADMIN'
+
+        profile.role = new_role
+        profile.save()
+
+        old_label = 'Admin' if old_role == 'ADMIN' else 'Ranger'
+        new_label = 'Admin' if new_role == 'ADMIN' else 'Ranger'
+
+        log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
+        messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
+    except User.DoesNotExist:
+        messages.error(request, "User not found.")
+    except Exception as e:
+        messages.error(request, f'Error changing role: {str(e)}')
+
+    return redirect('manage_users')
+
+
+@login_required
+@admin_required
+def toggle_user_status(request, user_id):
+    """Toggle a user's active status (deactivate/activate) or delete."""
+    try:
+        user = User.objects.get(id=user_id)
+        if user == request.user:
+            messages.error(request, "You cannot delete your own account.")
+            return redirect('manage_users')
+
+        email = user.email
+        user.delete()
+        log_action(request.user, 'DELETE_USER', f'Deleted user {email}')
+        messages.success(request, f'User {email} deleted successfully.')
+    except User.DoesNotExist:
+        messages.error(request, "User not found.")
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+
+    return redirect('manage_users')
 
 
 # ===== IoT API ENDPOINTS =====
