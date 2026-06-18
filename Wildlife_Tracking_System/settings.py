@@ -15,8 +15,8 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://web-production-050c1a.up.railway.app',
-    'http://web-production-050c1a.up.railway.app',
+    'https://traceit-web.up.railway.app',
+    'http://traceit-web.up.railway.app',
 ]
 
 INSTALLED_APPS = [
