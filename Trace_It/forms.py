@@ -1,7 +1,7 @@
 from django import forms
 from django.db import models
 from django.utils import timezone
-from .models import Animal, Species, TrackingTag, Deployment
+from .models import Animal, Species, TrackingTag, Deployment, Geofence
 
 
 class AnimalForm(forms.ModelForm):
