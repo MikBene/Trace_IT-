@@ -879,7 +879,16 @@ def export_alerts_csv(request):
 
     log_action(request.user, 'EXPORT_ALERTS_CSV', 'Exported alerts to CSV')
     return response
-
+    
+@login_required
+@admin_required
+def export_alerts(request):
+    """Export alerts as JSON (placeholder for button functionality)."""
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Export functionality coming soon',
+        'alerts': []
+    })
 
 @login_required
 @admin_required
