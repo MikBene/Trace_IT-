@@ -30,7 +30,6 @@ class Animal(models.Model):
     species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='Unknown')
     birth_year = models.PositiveIntegerField(null=True, blank=True)
-    estimated_age = models.PositiveIntegerField(null=True, blank=True)
     weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     health_status = models.CharField(max_length=50, default='Healthy')
     notes = models.TextField(blank=True)
