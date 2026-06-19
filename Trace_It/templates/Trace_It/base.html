@@ -138,7 +138,7 @@
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
         }
 
-        .role-ranger {
+        .role-staff {
             background: linear-gradient(135deg, #198754, #146c43);
             color: white;
             box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
@@ -308,6 +308,7 @@
 
 
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 
@@ -349,7 +350,7 @@
                     {% if user.userprofile.is_admin %}
                         <li class="nav-item">
                             <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}" href="{% url 'manage_users' %}">
-                                <i class="bi bi-people me-1"></i> Rangers
+                                <i class="bi bi-people me-1"></i> Staff
                             </a>
                         </li>
                         <li class="nav-item">
@@ -360,7 +361,7 @@
                     {% endif %}
                     <li class="nav-item ms-3">
                         <div class="user-welcome">
-                            <span class="role-badge {% if user.userprofile.is_admin %}role-admin{% else %}role-ranger{% endif %}">
+                            <span class="role-badge {% if user.userprofile.is_admin %}role-admin{% else %}role-staff{% endif %}">
                                 {{ user.userprofile.role }}
                             </span>
                             <span>{{ user.username }}</span>
@@ -377,7 +378,7 @@
                 {% else %}
                     <li class="nav-item">
                         <a href="{% url 'ranger_login' %}" class="btn-nav-login btn-nav-ranger">
-                            <i class="bi bi-shield me-1"></i> Ranger
+                            <i class="bi bi-shield me-1"></i> Staff
                         </a>
                     </li>
                     <li class="nav-item">
