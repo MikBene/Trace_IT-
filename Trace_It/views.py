@@ -297,11 +297,11 @@ def ranger_login(request):
         )
 
         if not (profile.is_ranger() or profile.is_admin()):
-            messages.error(request, 'This account is not authorized as a Ranger.')
+            messages.error(request, 'This account is not authorized as Staff.')
             return render(request, 'Trace_It/ranger_login.html')
 
         login(request, user)
-        messages.success(request, f'Welcome back, {user.first_name or user.email}! You are now logged in as Ranger.')
+        messages.success(request, f'Welcome back, {user.first_name or user.email}! You are now logged in as Staff.')
         return redirect('index')
 
     return render(request, 'Trace_It/ranger_login.html')
@@ -1001,9 +1001,13 @@ def manage_users(request):
         if action == 'create_ranger':
             email = request.POST.get('email', '').strip().lower()
             password = request.POST.get('password', '')
+            role = request.POST.get('role', 'RANGER').upper()
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
             phone = request.POST.get('phone', '').strip()
+
+            if role not in ['RANGER', 'ADMIN']:
+                role = 'RANGER'
 
             if not email or not password:
                 messages.error(request, 'Email and password are required.')
@@ -1034,8 +1038,8 @@ def manage_users(request):
                     role='RANGER',
                     phone=phone,
                 )
-                log_action(request.user, 'CREATE_RANGER', f'Created ranger account {email}')
-                messages.success(request, f'Ranger "{email}" created successfully!')
+                log_action(request.user, 'CREATE_RANGER', f'Created staff account {email}')
+                messages.success(request, f'Staff "{email}" created successfully!')
             except Exception as e:
                 messages.error(request, f'Error creating ranger: {str(e)}')
 
@@ -1100,8 +1104,8 @@ def manage_users(request):
                         profile.role = new_role
                         profile.save()
 
-                        old_label = 'Admin' if old_role == 'ADMIN' else 'Ranger'
-                        new_label = 'Admin' if new_role == 'ADMIN' else 'Ranger'
+                        old_label = 'Admin' if old_role == 'ADMIN' else 'Staff'
+                        new_label = 'Admin' if new_role == 'ADMIN' else 'Staff'
 
                         log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
                         messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
@@ -1152,7 +1156,7 @@ def manage_users(request):
 @login_required
 @admin_required
 def create_ranger(request):
-    """Create a new ranger account (separate view for backward compatibility)."""
+    """Create a new staff account (separate view for backward compatibility)."""
     if request.method == 'POST':
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password', '')
@@ -1189,8 +1193,8 @@ def create_ranger(request):
                 role='RANGER',
                 phone=phone,
             )
-            log_action(request.user, 'CREATE_RANGER', f'Created ranger account {email}')
-            messages.success(request, f'Ranger "{email}" created successfully!')
+            log_action(request.user, 'CREATE_RANGER', f'Created staff account {email}')
+            messages.success(request, f'Staff "{email}" created successfully!')
         except Exception as e:
             messages.error(request, f'Error creating ranger: {str(e)}')
 
@@ -1212,8 +1216,8 @@ def toggle_user_role(request, user_id):
         profile.role = new_role
         profile.save()
 
-        old_label = 'Admin' if old_role == 'ADMIN' else 'Ranger'
-        new_label = 'Admin' if new_role == 'ADMIN' else 'Ranger'
+        old_label = 'Admin' if old_role == 'ADMIN' else 'Staff'
+        new_label = 'Admin' if new_role == 'ADMIN' else 'Staff'
 
         log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
         messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')

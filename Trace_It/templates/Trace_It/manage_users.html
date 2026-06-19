@@ -1,15 +1,15 @@
 {% extends 'Trace_It/base.html' %}
 
-{% block title %}Manage Users - TRACE IT{% endblock %}
+{% block title %}Manage Staff - TRACE IT{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Manage Users</h2>
+<h2 class="mb-4">Manage Staff</h2>
 
 <div class="d-flex justify-content-between mb-3">
-    <h4>All Users</h4>
-    <!-- Button triggers the Create Ranger modal -->
-    <button type="button" class="btn btn-success btn-animated" data-bs-toggle="modal" data-bs-target="#createRangerModal">
-        <i class="bi bi-person-plus me-2"></i>Create New Ranger
+    <h4>All Staff</h4>
+    <!-- Button triggers the Add Staff modal -->
+    <button type="button" class="btn btn-success btn-animated" data-bs-toggle="modal" data-bs-target="#createStaffModal">
+        <i class="bi bi-person-plus me-2"></i>Add Staff
     </button>
 </div>
 
@@ -34,7 +34,7 @@
                         <td>{{ user.username }}</td>
                         <td>
                             <span class="badge bg-{% if user.userprofile.role == 'ADMIN' %}danger{% else %}success{% endif %} badge-animated">
-                                {{ user.userprofile.role }}
+                                {% if user.userprofile.role == 'RANGER' %}STAFF{% else %}{{ user.userprofile.role }}{% endif %}
                             </span>
                         </td>
                         <td>{{ user.first_name }} {{ user.last_name }}</td>
@@ -57,7 +57,7 @@
                                 <form method="post" action="{% url 'toggle_user_role' user.id %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-warning btn-animated"
-                                            onclick="return confirm('Change {{ user.email }} from {{ user.userprofile.role }} to {% if user.userprofile.role == 'ADMIN' %}RANGER{% else %}ADMIN{% endif %}?')">
+                                            onclick="return confirm('Change {{ user.email }} from {% if user.userprofile.role == 'RANGER' %}STAFF{% else %}{{ user.userprofile.role }}{% endif %} to {% if user.userprofile.role == 'ADMIN' %}STAFF{% else %}ADMIN{% endif %}?')">
                                         <i class="bi bi-arrow-left-right"></i> Role
                                     </button>
                                 </form>
@@ -86,11 +86,11 @@
 <!-- ============================================ -->
 <!-- CREATE RANGER MODAL                          -->
 <!-- ============================================ -->
-<div class="modal fade" id="createRangerModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="createStaffModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Create New Ranger</h5>
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Staff</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -101,7 +101,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Email Address <span class="text-danger">*</span></label>
-                        <input type="email" name="email" class="form-control" required placeholder="ranger@example.com">
+                        <input type="email" name="email" class="form-control" required placeholder="staff@example.com">
                     </div>
 
                     <div class="row">
@@ -121,13 +121,21 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
+                        <select name="role" class="form-control" required>
+                            <option value="RANGER">Staff</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Password <span class="text-danger">*</span></label>
                         <input type="password" name="password" class="form-control" required placeholder="Set a secure password">
                     </div>
 
                     <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-success flex-fill">
-                            <i class="bi bi-person-plus me-2"></i>Create Ranger
+                            <i class="bi bi-person-plus me-2"></i>Add Staff
                         </button>
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                             Cancel
