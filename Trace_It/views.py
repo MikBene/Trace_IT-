@@ -1,6 +1,13 @@
+import uuid
+import csv
+import json
+import logging
+import traceback
+from datetime import datetime, timedelta
+
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib import messages
@@ -10,12 +17,10 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models, transaction
+from django.db.models import Q
+
 from .models import Animal, Species, TrackingTag, Deployment, Location, Alert, Geofence, UserProfile, AuditLog, BiometricReading
 from .forms import AnimalForm, TrackingTagForm, GeofenceForm
-import csv
-import json
-import logging
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +29,11 @@ logger = logging.getLogger(__name__)
 
 def generate_animal_id():
     """Generate next auto-incrementing animal ID like ANM-2026-0001"""
-    from datetime import datetime
     year = datetime.now().year
     prefix = f"ANM-{year}-"
-    
-    # Find the highest existing ID for this year
+
     existing = Animal.objects.filter(animal_id__startswith=prefix).order_by('-animal_id').first()
-    
+
     if existing:
         try:
             last_num = int(existing.animal_id.split('-')[-1])
@@ -39,7 +42,7 @@ def generate_animal_id():
             next_num = 1
     else:
         next_num = 1
-    
+
     return f"{prefix}{next_num:04d}"
 
 
@@ -373,19 +376,16 @@ def index(request):
 
     for animal in animals:
         try:
-            # Get latest location
             latest_location = animal.get_latest_location()
-            
-            # Get active deployment & tag info
+
             deployment = animal.deployment_set.filter(is_active=True).first()
             has_tracker = deployment is not None
             tracker_id = deployment.tag.tag_serial_number if (deployment and deployment.tag) else None
             battery_level = deployment.tag.battery_level if (deployment and deployment.tag) else None
-            
-            # Determine status
+
             if latest_location:
                 time_diff = timezone.now() - latest_location.timestamp
-                if time_diff.total_seconds() < 3600:  # Active if location within 1 hour
+                if time_diff.total_seconds() < 3600:
                     status = 'active'
                 else:
                     status = 'inactive'
@@ -408,7 +408,6 @@ def index(request):
             logger.error(f"Error processing animal {animal.animal_id}: {e}")
             continue
 
-    # Calculate stats
     active_trackers = sum(1 for a in animal_data if a['has_tracker'])
     alerts_today = Alert.objects.filter(
         timestamp__date=timezone.now().date(),
@@ -537,7 +536,7 @@ def add_animal(request):
                     if not animal.animal_id:
                         animal.animal_id = generate_animal_id()
                     animal.save()
-                    
+
                     # Auto-attach an unassigned ESP32 tag if available
                     unassigned_tag = TrackingTag.objects.filter(is_assigned=False).first()
                     if unassigned_tag:
@@ -549,7 +548,7 @@ def add_animal(request):
                         unassigned_tag.is_assigned = True
                         unassigned_tag.save()
                         messages.info(request, f'Auto-attached tag {unassigned_tag.tag_serial_number} to {animal.nickname}.')
-                    
+
                 log_action(request.user, 'CREATE_ANIMAL', f'Added animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" added successfully.')
                 return redirect('index')
@@ -560,8 +559,10 @@ def add_animal(request):
             messages.error(request, 'Please fix the errors below.')
     else:
         form = AnimalForm(user=request.user)
-        # Pre-fill with auto-generated ID for display
-        form.fields['animal_id'].initial = generate_animal_id()
+        # FIX: Pass initial animal_id via form initial dict, not via form.fields
+        # animal_id is auto-generated in Animal.save(), so no need to set it here
+        # But if you want to show a preview, pass it as initial data
+        form = AnimalForm(user=request.user, initial={'animal_id': generate_animal_id()})
 
     return render(request, 'Trace_It/add_animal.html', {'form': form})
 
@@ -884,13 +885,12 @@ def map_view(request):
         demo_geofences = Geofence.objects.filter(name__startswith='Demo Fence').exists()
         locations_json = json.dumps(locations_data)
 
-        # FIX: Pass actual integer counts, NOT the JSON string length!
         context = {
             'locations_data': locations_json,
             'geofences': geofences,
             'demo_geofences': demo_geofences,
-            'total_animals': animals.count(),           # REAL count
-            'animals_with_gps': animals_with_gps,       # REAL count
+            'total_animals': animals.count(),
+            'animals_with_gps': animals_with_gps,
         }
         return render(request, 'Trace_It/map_view.html', context)
     except Exception as e:
@@ -997,7 +997,52 @@ def manage_users(request):
     if request.method == 'POST':
         action = request.POST.get('action', '')
 
-        if action == 'edit_ranger':
+        # ===== CREATE RANGER (from modal) =====
+        if action == 'create_ranger':
+            email = request.POST.get('email', '').strip().lower()
+            password = request.POST.get('password', '')
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            phone = request.POST.get('phone', '').strip()
+
+            if not email or not password:
+                messages.error(request, 'Email and password are required.')
+                return redirect('manage_users')
+
+            if '@' not in email or '.' not in email.split('@')[-1]:
+                messages.error(request, 'Please enter a valid email address.')
+                return redirect('manage_users')
+
+            if User.objects.filter(email__iexact=email).exists():
+                messages.error(request, f'A user with email "{email}" already exists.')
+                return redirect('manage_users')
+
+            if len(password) < 6:
+                messages.error(request, 'Password must be at least 6 characters.')
+                return redirect('manage_users')
+
+            try:
+                user = User.objects.create(
+                    username=email,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    password=make_password(password),
+                )
+                UserProfile.objects.create(
+                    user=user,
+                    role='RANGER',
+                    phone=phone,
+                )
+                log_action(request.user, 'CREATE_RANGER', f'Created ranger account {email}')
+                messages.success(request, f'Ranger "{email}" created successfully!')
+            except Exception as e:
+                messages.error(request, f'Error creating ranger: {str(e)}')
+
+            return redirect('manage_users')
+
+        # ===== EDIT RANGER =====
+        elif action == 'edit_ranger':
             user_id = request.POST.get('user_id')
             if user_id:
                 try:
@@ -1088,13 +1133,12 @@ def manage_users(request):
             return redirect('manage_users')
 
     users = User.objects.all().select_related('userprofile').order_by('email')
-    
-    # Calculate stats for the template
+
     total_users = users.count()
     admin_count = users.filter(userprofile__role='ADMIN').count()
     ranger_count = users.filter(userprofile__role='RANGER').count()
     active_count = users.filter(is_active=True).count()
-    
+
     context = {
         'users': users,
         'total_users': total_users,
@@ -1108,7 +1152,7 @@ def manage_users(request):
 @login_required
 @admin_required
 def create_ranger(request):
-    """Create a new ranger account."""
+    """Create a new ranger account (separate view for backward compatibility)."""
     if request.method == 'POST':
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password', '')
@@ -1220,8 +1264,8 @@ def setup_demo_geofences(request):
                     lat = float(loc.latitude)
                     lon = float(loc.longitude)
                 else:
-                    lat = default_lat + (animal.animal_id * 0.0001)
-                    lon = default_lon + (animal.animal_id * 0.0001)
+                    lat = default_lat + (animal.id * 0.0001)
+                    lon = default_lon + (animal.id * 0.0001)
 
                 fence_name = f"Demo Fence - {animal.nickname} (10m)"
 
@@ -1272,7 +1316,7 @@ def iot_ingest(request):
     try:
         tag = TrackingTag.objects.get(tag_serial_number=serial)
     except TrackingTag.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': f'Tag {serial} not found'}, status=404)
+        return JsonResponse({'status': 'error', 'message': 'Tag not found'}, status=404)
 
     deployment = Deployment.objects.filter(tag=tag, is_active=True).first()
     if not deployment:

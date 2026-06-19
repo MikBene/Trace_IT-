@@ -7,7 +7,10 @@
 
 <div class="d-flex justify-content-between mb-3">
     <h4>All Users</h4>
-    <a href="{% url 'create_ranger' %}" class="btn btn-success btn-animated">+ Create New Ranger</a>
+    <!-- Button triggers the Create Ranger modal -->
+    <button type="button" class="btn btn-success btn-animated" data-bs-toggle="modal" data-bs-target="#createRangerModal">
+        <i class="bi bi-person-plus me-2"></i>Create New Ranger
+    </button>
 </div>
 
 <div class="card shadow card-animated">
@@ -46,14 +49,14 @@
                         </td>
                         <td>
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-primary btn-animated" 
+                                <button type="button" class="btn btn-sm btn-primary btn-animated"
                                         data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
                                     <i class="bi bi-pencil"></i> Edit
                                 </button>
 
                                 <form method="post" action="{% url 'toggle_user_role' user.id %}" class="d-inline">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-warning btn-animated" 
+                                    <button type="submit" class="btn btn-sm btn-warning btn-animated"
                                             onclick="return confirm('Change {{ user.email }} from {{ user.userprofile.role }} to {% if user.userprofile.role == 'ADMIN' %}RANGER{% else %}ADMIN{% endif %}?')">
                                         <i class="bi bi-arrow-left-right"></i> Role
                                     </button>
@@ -61,7 +64,7 @@
 
                                 <form method="post" action="{% url 'toggle_user_status' user.id %}" class="d-inline">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-danger btn-animated" 
+                                    <button type="submit" class="btn btn-sm btn-danger btn-animated"
                                             onclick="return confirm('Are you sure you want to DELETE {{ user.email }}? This action cannot be undone.')">
                                         <i class="bi bi-trash"></i> Delete
                                     </button>
@@ -76,6 +79,62 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CREATE RANGER MODAL                          -->
+<!-- ============================================ -->
+<div class="modal fade" id="createRangerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Create New Ranger</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Posts to the same manage_users view with action=create_ranger -->
+                <form method="post" action="{% url 'manage_users' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_ranger">
+
+                    <div class="mb-3">
+                        <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control" required placeholder="ranger@example.com">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">First Name</label>
+                            <input type="text" name="first_name" class="form-control" placeholder="John">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" class="form-control" placeholder="Doe">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" name="phone" class="form-control" placeholder="+1 234 567 8900">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Password <span class="text-danger">*</span></label>
+                        <input type="password" name="password" class="form-control" required placeholder="Set a secure password">
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-success flex-fill">
+                            <i class="bi bi-person-plus me-2"></i>Create Ranger
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>

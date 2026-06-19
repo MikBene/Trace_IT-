@@ -46,6 +46,7 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
+        # species_name and esp32_tag are extra form fields, not model fields
         fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'notes']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
@@ -59,13 +60,16 @@ class AnimalForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # Set up esp32_tag queryset
         try:
             self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
 
             if self.instance and self.instance.pk:
+                # Editing existing animal — set initial species_name from instance
                 if hasattr(self.instance, 'species') and self.instance.species:
                     self.fields['species_name'].initial = self.instance.species.common_name
 
+                # Include currently assigned tag in queryset + set initial
                 current_tag_id = None
                 try:
                     deployment = self.instance.deployment_set.filter(is_active=True).first()
@@ -94,6 +98,7 @@ class AnimalForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
+        """Save the animal and handle species + tag assignment."""
         species_name = self.cleaned_data.get('species_name')
         esp32_tag = self.cleaned_data.get('esp32_tag')
 
@@ -104,15 +109,20 @@ class AnimalForm(forms.ModelForm):
             'Zebra': 'Equus quagga',
         }
 
+        # Resolve species_name to Species model instance
         if species_name:
             species_obj, created = Species.objects.get_or_create(
                 common_name=species_name,
                 defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
             )
             self.instance.species = species_obj
+        else:
+            self.instance.species = None
 
+        # Save the Animal instance first (so it has a PK for Deployment FK)
         instance = super().save(commit=commit)
 
+        # Handle tag assignment/unassignment
         if esp32_tag:
             existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
             if not existing:
