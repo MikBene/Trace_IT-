@@ -7,18 +7,35 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-CHANGE-THIS-IN-PRODUCTION-abcdefghijklmnopqrstuvwxyz123456789')
+# ─── SECURITY ───
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-CHANGE-THIS-IN-PRODUCTION-abcdefghijklmnopqrstuvwxyz123456789'
+)
 
-# Set to True to see errors during debugging
-DEBUG = True
+# Set False in production
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'traceit-web.up.railway.app',
+    'localhost',
+    '127.0.0.1',
+    '*',
+]
 
 CSRF_TRUSTED_ORIGINS = [
     'https://traceit-web.up.railway.app',
     'http://traceit-web.up.railway.app',
+    'https://localhost',
+    'http://localhost',
 ]
 
+# ─── AUTH REDIRECTS (stay on same site, no new windows) ───
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+# ─── APPLICATIONS ───
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -30,6 +47,7 @@ INSTALLED_APPS = [
     'Trace_It',
 ]
 
+# ─── MIDDLEWARE ───
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -61,6 +79,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Wildlife_Tracking_System.wsgi.application'
 
+# ─── DATABASE ───
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
@@ -75,6 +94,7 @@ else:
         }
     }
 
+# ─── PASSWORD VALIDATION ───
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -82,17 +102,30 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# ─── INTERNATIONALIZATION ───
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# ─── STATIC FILES ───
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
+# ─── DEFAULT FIELD TYPE ───
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ─── EMAIL ───
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'trace-it@wildlife.org'
+
+# ─── PRODUCTION SECURITY HEADERS ───
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_SSL_REDIRECT = False  # Railway handles HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
