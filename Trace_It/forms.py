@@ -46,7 +46,6 @@ class AnimalForm(forms.ModelForm):
 
     class Meta:
         model = Animal
-        # species_name and esp32_tag are extra form fields, not model fields
         fields = ['nickname', 'gender', 'birth_year', 'weight', 'health_status', 'notes']
         widgets = {
             'nickname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter animal nickname'}),
@@ -60,16 +59,13 @@ class AnimalForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Set up esp32_tag queryset
         try:
             self.fields['esp32_tag'].queryset = TrackingTag.objects.filter(is_assigned=False)
 
             if self.instance and self.instance.pk:
-                # Editing existing animal — set initial species_name from instance
                 if hasattr(self.instance, 'species') and self.instance.species:
                     self.fields['species_name'].initial = self.instance.species.common_name
 
-                # Include currently assigned tag in queryset + set initial
                 current_tag_id = None
                 try:
                     deployment = self.instance.deployment_set.filter(is_active=True).first()
@@ -98,7 +94,6 @@ class AnimalForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
-        """Save the animal and handle species + tag assignment."""
         species_name = self.cleaned_data.get('species_name')
         esp32_tag = self.cleaned_data.get('esp32_tag')
 
@@ -109,30 +104,23 @@ class AnimalForm(forms.ModelForm):
             'Zebra': 'Equus quagga',
         }
 
-        # Resolve species_name to Species model instance
         if species_name:
             species_obj, created = Species.objects.get_or_create(
                 common_name=species_name,
                 defaults={'scientific_name': species_map.get(species_name, 'Unknown')}
             )
             self.instance.species = species_obj
-        else:
-            self.instance.species = None
 
-        # Save the Animal instance first (so it has a PK for Deployment FK)
         instance = super().save(commit=commit)
 
-        # Handle tag assignment/unassignment
         if esp32_tag:
             existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
             if not existing:
-                # Deactivate any other active deployment for this tag
                 Deployment.objects.filter(tag=esp32_tag, is_active=True).exclude(animal=instance).update(
                     is_active=False,
                     end_date=timezone.now()
                 )
 
-                # Deactivate old deployments for this animal
                 old_deployments = Deployment.objects.filter(animal=instance, is_active=True).exclude(tag=esp32_tag)
                 for dep in old_deployments:
                     dep.is_active = False
@@ -142,12 +130,10 @@ class AnimalForm(forms.ModelForm):
                         dep.tag.is_assigned = False
                         dep.tag.save()
 
-                # Create new deployment
                 Deployment.objects.create(animal=instance, tag=esp32_tag, is_active=True)
                 esp32_tag.is_assigned = True
                 esp32_tag.save()
         else:
-            # No tag selected — deactivate all active deployments for this animal
             old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
             for dep in old_deployments:
                 dep.is_active = False
@@ -165,11 +151,19 @@ class TrackingTagForm(forms.ModelForm):
 
     class Meta:
         model = TrackingTag
-        fields = ['tag_serial_number', 'battery_level', 'manufacturer', 'last_service_date']
+        fields = ['tag_serial_number', 'model', 'manufacturer', 'battery_level', 'last_service_date']
         widgets = {
             'tag_serial_number': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'e.g., ESP32-TAG-001 or TAG-2024-001'
+            }),
+            'model': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., ESP32-GPS, Garmin, Telonics'
+            }),
+            'manufacturer': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., ESP32, Garmin, Telonics'
             }),
             'battery_level': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -177,10 +171,6 @@ class TrackingTagForm(forms.ModelForm):
                 'min': '0',
                 'max': '100',
                 'step': '0.01'
-            }),
-            'manufacturer': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'e.g., ESP32, Garmin, Telonics'
             }),
             'last_service_date': forms.DateInput(attrs={
                 'class': 'form-control',
