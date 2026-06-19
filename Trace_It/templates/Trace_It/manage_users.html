@@ -72,61 +72,6 @@
                             </div>
                         </td>
                     </tr>
-
-                    <!-- Edit Modal for this user -->
-                    <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit User: {{ user.get_full_name|default:user.email }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form method="post" action="{% url 'manage_users' %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="edit_ranger">
-                                        <input type="hidden" name="user_id" value="{{ user.id }}">
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Email Address <span class="text-danger">*</span></label>
-                                            <input type="email" name="email" class="form-control" required value="{{ user.email }}">
-                                        </div>
-
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label class="form-label">First Name</label>
-                                                <input type="text" name="first_name" class="form-control" value="{{ user.first_name|default:'' }}">
-                                            </div>
-                                            <div class="col-md-6 mb-3">
-                                                <label class="form-label">Last Name</label>
-                                                <input type="text" name="last_name" class="form-control" value="{{ user.last_name|default:'' }}">
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Phone Number</label>
-                                            <input type="tel" name="phone" class="form-control" value="{{ user.userprofile.phone|default:'' }}">
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label">New Password</label>
-                                            <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
-                                            <div class="form-text">Only fill this if you want to change the password</div>
-                                        </div>
-
-                                        <div class="d-flex gap-2 mt-4">
-                                            <button type="submit" class="btn btn-primary flex-fill">
-                                                <i class="bi bi-save me-2"></i>Save Changes
-                                            </button>
-                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                     {% empty %}
                     <tr>
                         <td colspan="7" class="text-center text-muted py-4">No users found.</td>
@@ -137,4 +82,64 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================ -->
+<!-- ALL EDIT MODALS MOVED OUTSIDE THE TABLE      -->
+<!-- ============================================ -->
+{% for user in users %}
+<div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit User: {{ user.get_full_name|default:user.email }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'manage_users' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="edit_ranger">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control" required value="{{ user.email }}">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">First Name</label>
+                            <input type="text" name="first_name" class="form-control" value="{{ user.first_name|default:'' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" class="form-control" value="{{ user.last_name|default:'' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" name="phone" class="form-control" value="{{ user.userprofile.phone|default:'' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
+                        <div class="form-text">Only fill this if you want to change the password</div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="bi bi-save me-2"></i>Save Changes
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 {% endblock %}

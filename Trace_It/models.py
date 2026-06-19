@@ -72,9 +72,8 @@ class Animal(models.Model):
         loc = self.get_latest_location()
         if not loc:
             return False
-        # Check if stationary for 90+ minutes
         time_diff = timezone.now() - loc.timestamp
-        return time_diff.total_seconds() > 5400  # 90 minutes
+        return time_diff.total_seconds() > 5400
 
     def is_stationary_minutes(self, minutes=90):
         loc = self.get_latest_location()
@@ -223,8 +222,7 @@ class Geofence(models.Model):
         return self.name
 
     def check_location_inside(self, lat, lon):
-        """Check if a location is inside the circular geofence."""
-        R = 6371000  # Earth radius in meters
+        R = 6371000
         lat1 = math.radians(float(self.center_latitude))
         lat2 = math.radians(lat)
         dlat = math.radians(lat - float(self.center_latitude))

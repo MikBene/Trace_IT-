@@ -326,56 +326,112 @@ def logout_view(request):
 
 # ===== MAIN PAGES =====
 
+
 @login_required
 def index(request):
+    """Home page showing all animals with their latest data."""
+    animals = []
+    animal_data = []
+    total_animals = 0
+
     try:
         animals = Animal.objects.all().select_related('species')
-        animal_data = []
-
-        for animal in animals:
-            try:
-                latest_location = None
-                latest_biometrics = None
-                battery_level = None
-
-                try:
-                    latest_location = animal.get_latest_location()
-                except Exception:
-                    pass
-
-                try:
-                    latest_biometrics = animal.get_latest_biometrics()
-                except Exception:
-                    pass
-
-                if latest_location:
-                    try:
-                        tag = latest_location.tag
-                        battery_level = tag.battery_level if tag else None
-                    except Exception:
-                        pass
-
-                animal_data.append({
-                    'animal': animal,
-                    'latest_location': latest_location,
-                    'latest_biometrics': latest_biometrics,
-                    'battery_level': battery_level,
-                    'status': 'Active' if latest_location else 'Inactive',
-                    'health_status': animal.health_status,
-                })
-            except Exception as e:
-                logger.error(f"Error processing animal {animal.animal_id}: {e}")
-                continue
-
-        context = {
-            'animal_data': animal_data,
-            'total_animals': len(animals),
-        }
-        return render(request, 'Trace_It/index.html', context)
+        total_animals = animals.count()
     except Exception as e:
-        logger.error(f"Error in index view: {e}")
-        messages.error(request, 'An error occurred loading the animal list.')
-        return render(request, 'Trace_It/index.html', {'animal_data': [], 'total_animals': 0})
+        logger.error(f"Error fetching animals: {e}")
+        messages.error(request, 'Database error loading animals. Please try again.')
+        return render(request, 'Trace_It/index.html', {
+            'animal_data': [],
+            'total_animals': 0,
+            'debug': settings.DEBUG
+        })
+
+    for animal in animals:
+        try:
+            latest_location = None
+            latest_biometrics = None
+            battery_level = None
+
+            try:
+                latest_location = animal.get_latest_location()
+            except Exception as e:
+                logger.warning(f"No location for animal {animal.animal_id}: {e}")
+
+            try:
+                latest_biometrics = animal.get_latest_biometrics()
+            except Exception as e:
+                logger.warning(f"No biometrics for animal {animal.animal_id}: {e}")
+
+            if latest_location:
+                try:
+                    tag = latest_location.tag
+                    battery_level = tag.battery_level if tag else None
+                except Exception:
+                    pass
+
+            animal_data.append({
+                'animal': animal,
+                'latest_location': latest_location,
+                'latest_biometrics': latest_biometrics,
+                'battery_level': battery_level,
+                'status': 'Active' if latest_location else 'Inactive',
+                'health_status': animal.health_status or 'Unknown',
+            })
+        except Exception as e:
+            logger.error(f"Error processing animal {animal.animal_id}: {e}")
+            continue
+
+    context = {
+        'animal_data': animal_data,
+        'total_animals': total_animals,
+        'debug': settings.DEBUG
+    }
+    return render(request, 'Trace_It/index.html', context)
+
+
+@login_required
+@admin_required
+def dashboard(request):
+    """Admin dashboard with stats and overview."""
+    # Default values for all context variables
+    context = {
+        'total_animals': 0,
+        'total_tags': 0,
+        'active_deployments': 0,
+        'total_locations': 0,
+        'unresolved_alerts': 0,
+        'recent_alerts': [],
+        'recent_locations': [],
+        'recent_logs': [],
+        'low_battery_tags': 0,
+        'recent_biometrics': [],
+        'sensor_errors': 0,
+        'critical_health_alerts': 0,
+    }
+
+    try:
+        context['total_animals'] = Animal.objects.count()
+        context['total_tags'] = TrackingTag.objects.count()
+        context['active_deployments'] = Deployment.objects.filter(is_active=True).count()
+        context['total_locations'] = Location.objects.count()
+        context['unresolved_alerts'] = Alert.objects.filter(is_resolved=False).count()
+        context['recent_alerts'] = Alert.objects.filter(is_resolved=False).order_by('-timestamp')[:10]
+        context['recent_locations'] = Location.objects.all().select_related('tag').order_by('-timestamp')[:10]
+        context['recent_logs'] = AuditLog.objects.all().order_by('-timestamp')[:20]
+        context['low_battery_tags'] = TrackingTag.objects.filter(battery_level__lt=20).count()
+        context['recent_biometrics'] = BiometricReading.objects.all().order_by('-timestamp')[:10]
+        context['sensor_errors'] = BiometricReading.objects.exclude(sensor_status='OK').count()
+        context['critical_health_alerts'] = Alert.objects.filter(
+            alert_type='HEALTH', 
+            is_resolved=False,
+            severity__in=['HIGH', 'CRITICAL']
+        ).count()
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+        messages.error(request, f'Dashboard error: {str(e)}')
+        # Return context with defaults instead of empty dict
+
+    return render(request, 'Trace_It/dashboard.html', context)
 
 
 @login_required
@@ -506,49 +562,6 @@ def delete_animal(request, animal_id):
         return redirect('index')
 
     return redirect('index')
-
-
-@login_required
-@admin_required
-def dashboard(request):
-    try:
-        total_animals = Animal.objects.count()
-        total_tags = TrackingTag.objects.count()
-        active_deployments = Deployment.objects.filter(is_active=True).count()
-        total_locations = Location.objects.count()
-        unresolved_alerts = Alert.objects.filter(is_resolved=False).count()
-        recent_alerts = Alert.objects.filter(is_resolved=False).order_by('-timestamp')[:10]
-        recent_locations = Location.objects.all().select_related('tag').order_by('-timestamp')[:10]
-        recent_logs = AuditLog.objects.all().order_by('-timestamp')[:20]
-        low_battery_tags = TrackingTag.objects.filter(battery_level__lt=20).count()
-
-        recent_biometrics = BiometricReading.objects.all().order_by('-timestamp')[:10]
-        sensor_errors = BiometricReading.objects.exclude(sensor_status='OK').count()
-        critical_health_alerts = Alert.objects.filter(
-            alert_type='HEALTH', 
-            is_resolved=False,
-            severity__in=['HIGH', 'CRITICAL']
-        ).count()
-
-        context = {
-            'total_animals': total_animals,
-            'total_tags': total_tags,
-            'active_deployments': active_deployments,
-            'total_locations': total_locations,
-            'unresolved_alerts': unresolved_alerts,
-            'recent_alerts': recent_alerts,
-            'recent_locations': recent_locations,
-            'recent_logs': recent_logs,
-            'low_battery_tags': low_battery_tags,
-            'recent_biometrics': recent_biometrics,
-            'sensor_errors': sensor_errors,
-            'critical_health_alerts': critical_health_alerts,
-        }
-        return render(request, 'Trace_It/dashboard.html', context)
-    except Exception as e:
-        logger.error(f"Dashboard error: {e}")
-        messages.error(request, f'Dashboard error: {str(e)}')
-        return render(request, 'Trace_It/dashboard.html', {})
 
 
 @login_required
@@ -879,11 +892,11 @@ def export_alerts_csv(request):
 
     log_action(request.user, 'EXPORT_ALERTS_CSV', 'Exported alerts to CSV')
     return response
-    
+
 @login_required
 @admin_required
 def export_alerts(request):
-    """Export alerts as JSON (placeholder for button functionality)."""
+    """Export alerts as JSON for dashboard button."""
     return JsonResponse({
         'status': 'success',
         'message': 'Export functionality coming soon',
