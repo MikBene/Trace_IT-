@@ -306,6 +306,7 @@
         }
     </style>
 
+
 <base target="_blank">
 </head>
 <body>
@@ -442,5 +443,16 @@
     }
 </script>
 {% block extra_js %}{% endblock %}
+
+<script>
+    // Force all links to open in same tab (override any target="_blank")
+    document.querySelectorAll('a[target="_blank"]').forEach(function(link) {
+        link.removeAttribute('target');
+    });
+    // Also override base target if present
+    var baseTag = document.querySelector('base[target]');
+    if (baseTag) baseTag.remove();
+</script>
+
 </body>
 </html>
