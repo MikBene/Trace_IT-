@@ -357,6 +357,30 @@
     .bio-stat i {
         font-size: 14px;
     }
+
+    /* Quick Actions */
+    .quick-action-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        padding: 15px 20px;
+        color: rgba(255,255,255,0.8);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: all 0.3s;
+        font-weight: 500;
+    }
+    .quick-action-btn:hover {
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.2);
+        transform: translateY(-2px);
+        color: white;
+    }
+    .quick-action-btn i {
+        font-size: 20px;
+    }
 </style>
 {% endblock %}
 
@@ -383,7 +407,37 @@
 <!-- Title -->
 <h2 class="mb-4 fade-in-up delay-1" style="font-family: 'Orbitron', sans-serif; letter-spacing: 4px;">Dashboard</h2>
 
-<!-- Stats Cards -->
+<!-- Quick Actions Row (Admin Only) -->
+{% if user.userprofile.is_admin %}
+<div class="row mb-4 fade-in-up delay-1">
+    <div class="col-md-3 col-6 mb-3">
+        <a href="{% url 'add_animal' %}" class="quick-action-btn">
+            <i class="bi bi-plus-circle" style="color: #198754;"></i>
+            <span>Add Animal</span>
+        </a>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <a href="{% url 'add_tag' %}" class="quick-action-btn">
+            <i class="bi bi-tag" style="color: #0dcaf0;"></i>
+            <span>Add Tag</span>
+        </a>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <a href="{% url 'add_geofence' %}" class="quick-action-btn">
+            <i class="bi bi-geo-alt" style="color: #ffc107;"></i>
+            <span>Add Geofence</span>
+        </a>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <a href="{% url 'map_view' %}" class="quick-action-btn">
+            <i class="bi bi-map" style="color: #dc3545;"></i>
+            <span>View Map</span>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats Cards Row 1 -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
         <div class="stat-card stat-card-green fade-in-up delay-1">
@@ -415,7 +469,7 @@
     </div>
 </div>
 
-<!-- NEW: Biometric Stats Row -->
+<!-- Biometric Stats Row -->
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
         <div class="stat-card stat-card-purple fade-in-up delay-1">
@@ -498,7 +552,7 @@
         </div>
     </div>
 
-    <!-- NEW: Recent Biometrics -->
+    <!-- Recent Biometrics -->
     <div class="col-md-4 mb-4">
         <div class="section-card fade-in-up delay-4">
             <div class="section-header section-header-purple">
@@ -512,11 +566,11 @@
                                 <strong>{{ bio.tag.tag_serial_number }}</strong>
                             </span>
                             <span class="bio-stat">
-                                {% if bio.heart_rate_bpm %}
-                                    <i class="bi bi-heart-pulse text-danger"></i> {{ bio.heart_rate_bpm }}
+                                {% if bio.heart_rate %}
+                                    <i class="bi bi-heart-pulse text-danger"></i> {{ bio.heart_rate }}
                                 {% endif %}
-                                {% if bio.spo2_percent %}
-                                    <i class="bi bi-droplet text-info"></i> {{ bio.spo2_percent|floatformat:0 }}%
+                                {% if bio.spo2 %}
+                                    <i class="bi bi-droplet text-info"></i> {{ bio.spo2 }}%
                                 {% endif %}
                                 {% if bio.sensor_status != 'OK' %}
                                     <i class="bi bi-exclamation-triangle text-warning"></i>

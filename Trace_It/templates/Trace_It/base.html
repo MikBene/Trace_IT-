@@ -287,8 +287,26 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(25, 135, 84, 0.5);
         }
+
+        /* Card animations */
+        .card-animated {
+            transition: all 0.3s ease;
+        }
+        .card-animated:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        /* Table row animations */
+        .table-row-animated {
+            transition: all 0.2s ease;
+        }
+        .table-row-animated:hover {
+            background: rgba(25, 135, 84, 0.05);
+        }
     </style>
 
+<base target="_blank">
 </head>
 <body>
 
@@ -305,22 +323,22 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
-                    <a class="nav-link nav-link-custom {% if request.path == '/' or request.path == '/home/' %}active{% endif %}" href="{% url 'index' %}">
+                    <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'index' %}active{% endif %}" href="{% url 'index' %}">
                         <i class="bi bi-house-door me-1"></i> Home
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link nav-link-custom {% if request.path == '/dashboard/' %}active{% endif %}" href="{% url 'dashboard' %}">
+                    <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                         <i class="bi bi-speedometer2 me-1"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link nav-link-custom {% if request.path == '/map/' %}active{% endif %}" href="{% url 'map_view' %}">
+                    <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'map_view' %}active{% endif %}" href="{% url 'map_view' %}">
                         <i class="bi bi-map me-1"></i> Map
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link nav-link-custom {% if request.path == '/alerts/' %}active{% endif %}" href="{% url 'alerts' %}">
+                    <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" href="{% url 'alerts' %}">
                         <i class="bi bi-bell me-1"></i> Alerts
                     </a>
                 </li>
@@ -329,12 +347,12 @@
                 {% if user.is_authenticated %}
                     {% if user.userprofile.is_admin %}
                         <li class="nav-item">
-                            <a class="nav-link nav-link-custom {% if request.path == '/admin/users/' %}active{% endif %}" href="{% url 'manage_users' %}">
+                            <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}" href="{% url 'manage_users' %}">
                                 <i class="bi bi-people me-1"></i> Rangers
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link nav-link-custom {% if request.path == '/admin/audit-log/' %}active{% endif %}" href="{% url 'audit_log' %}">
+                            <a class="nav-link nav-link-custom {% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}" href="{% url 'audit_log' %}">
                                 <i class="bi bi-journal-text me-1"></i> Audit
                             </a>
                         </li>
@@ -421,15 +439,6 @@
             utterance.pitch = 1.1;
             speechSynthesis.speak(utterance);
         }
-    }
-
-    function toggleDarkMode() {
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-    }
-
-    if (localStorage.getItem('darkMode') === 'true') {
-        document.body.classList.add('dark-mode');
     }
 </script>
 {% block extra_js %}{% endblock %}

@@ -25,7 +25,9 @@ class Animal(models.Model):
         ('Unknown', 'Unknown'),
     ]
 
-    animal_id = models.AutoField(primary_key=True)
+    # Keep existing auto 'id' as primary key (Django default)
+    # Auto-generated unique display ID (e.g., ANM-2026-0001)
+    animal_id = models.CharField(max_length=20, unique=True, blank=True)
     nickname = models.CharField(max_length=100)
     species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='Unknown')
@@ -41,6 +43,16 @@ class Animal(models.Model):
 
     def __str__(self):
         return f"{self.nickname} ({self.species.common_name if self.species else 'Unknown Species'})"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate animal_id on first save if not provided
+        if not self.animal_id:
+            year = timezone.now().year
+            count = Animal.objects.filter(
+                created_at__year=year
+            ).count() + 1
+            self.animal_id = f"ANM-{year}-{count:04d}"
+        super().save(*args, **kwargs)
 
     @property
     def health_status_display(self):
@@ -82,6 +94,15 @@ class Animal(models.Model):
         time_diff = timezone.now() - loc.timestamp
         return time_diff.total_seconds() > (minutes * 60)
 
+    @property
+    def has_active_deployment(self):
+        return self.deployment_set.filter(is_active=True).exists()
+
+    @property
+    def active_tag(self):
+        deployment = self.deployment_set.filter(is_active=True).first()
+        return deployment.tag if deployment else None
+
 
 class TrackingTag(models.Model):
     tag_id = models.AutoField(primary_key=True)
@@ -99,6 +120,10 @@ class TrackingTag(models.Model):
     def __str__(self):
         return self.tag_serial_number
 
+    def get_assigned_animal(self):
+        deployment = self.deployment_set.filter(is_active=True).first()
+        return deployment.animal if deployment else None
+
 
 class Deployment(models.Model):
     deployment_id = models.AutoField(primary_key=True)
@@ -113,6 +138,13 @@ class Deployment(models.Model):
 
     def __str__(self):
         return f"{self.tag.tag_serial_number} -> {self.animal.nickname}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Auto-update tag assignment status
+        if self.is_active:
+            self.tag.is_assigned = True
+            self.tag.save(update_fields=['is_assigned'])
 
 
 class Location(models.Model):

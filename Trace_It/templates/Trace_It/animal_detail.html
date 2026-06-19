@@ -1,365 +1,269 @@
 {% extends 'Trace_It/base.html' %}
 
-{% block title %}{{ animal.nickname }} - Details - TRACE IT{% endblock %}
+{% block title %}Edit {{ animal.nickname }} - TRACE IT{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-form-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    .edit-form-header {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        padding: 25px;
+        color: white;
+    }
+    .edit-form-header h3 {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 2px;
+    }
+    .edit-form-body {
+        padding: 30px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-label {
+        display: block;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 14px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .form-control-custom {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 14px 18px;
+        color: white;
+        font-size: 15px;
+        width: 100%;
+        transition: all 0.3s;
+    }
+    .form-control-custom:focus {
+        outline: none;
+        border-color: #198754;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.2);
+        background: rgba(255, 255, 255, 0.12);
+    }
+    .form-control-custom::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+    }
+    select.form-control-custom {
+        appearance: auto;
+        color: white;
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+    select.form-control-custom option {
+        background: #0a0e27;
+        color: white;
+    }
+    textarea.form-control-custom {
+        min-height: 100px;
+        resize: vertical;
+    }
+    .btn-save {
+        background: linear-gradient(135deg, #198754, #146c43);
+        border: none;
+        color: white;
+        padding: 14px 30px;
+        border-radius: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
+    }
+    .btn-cancel {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 14px 30px;
+        border-radius: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    .btn-cancel:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        color: white;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .animal-id-display {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 16px;
+        display: inline-block;
+        font-family: 'Orbitron', monospace;
+        color: #0dcaf0;
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+    .help-text {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    .error-text {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-4">
-        <!-- Animal Info Card -->
-        <div class="card shadow card-animated">
-            <div class="card-header bg-success text-white">
-                <h4 class="mb-0">{{ animal.nickname }}</h4>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="edit-form-card">
+            <div class="edit-form-header">
+                <h3><i class="bi bi-pencil-square me-2"></i>Edit Animal</h3>
+                <p class="mb-0 mt-2 opacity-75">Animal ID: <span class="animal-id-display">{{ animal.animal_id }}</span></p>
             </div>
-            <div class="card-body text-center">
-                <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3" style="height: 200px;">
-                    <span style="font-size: 80px;">🦁</span>
-                </div>
-                <h5>{{ animal.species.common_name }}</h5>
-                <p class="text-muted"><em>{{ animal.species.scientific_name }}</em></p>
-                <hr>
-                <p><strong>Gender:</strong> {{ animal.gender }}</p>
-                <p><strong>Birth Year:</strong> {{ animal.birth_year|default:"Unknown" }}</p>
-                <p><strong>Weight:</strong> {{ animal.weight|default:"Unknown" }} kg</p>
-                <p><strong>Health:</strong> {{ animal.health_status }}</p>
-                <p><strong>Last Seen:</strong> {{ animal.last_seen|default:"Never" }}</p>
-                {% if animal.is_stationary %}
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i> <strong>Stationary for 90+ minutes!</strong>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+            <div class="edit-form-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
 
-        <!-- Tracking Tag Card -->
-        {% if tag %}
-        <div class="card shadow mt-3 card-animated">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">Tracking Tag</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Serial:</strong> {{ tag.tag_serial_number }}</p>
-                <p><strong>Battery:</strong> 
-                    <span class="badge bg-{% if tag.battery_level > 50 %}success{% elif tag.battery_level > 20 %}warning{% else %}danger{% endif %} badge-animated">
-                        {{ tag.battery_level }}%
-                    </span>
-                </p>
-                <p><strong>Manufacturer:</strong> {{ tag.manufacturer|default:"N/A" }}</p>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- LIVE BIOMETRICS CARD -->
-        <div class="card shadow mt-3 card-animated">
-            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> Live Vitals</h5>
-                <span class="badge bg-light text-danger" id="vitals-status">Connecting...</span>
-            </div>
-            <div class="card-body">
-                {% if latest_biometrics %}
-                    <div class="row text-center mb-3">
-                        <div class="col-4">
-                            <div class="display-6 fw-bold {% if latest_biometrics.heart_rate_bpm and latest_biometrics.heart_rate_bpm < 30 or latest_biometrics.heart_rate_bpm > 150 %}text-danger{% else %}text-success{% endif %}" id="hr-display">
-                                {{ latest_biometrics.heart_rate_bpm|default:"--" }}
-                            </div>
-                            <small class="text-muted">BPM</small>
-                        </div>
-                        <div class="col-4">
-                            <div class="display-6 fw-bold text-info" id="spo2-display">
-                                {% if latest_biometrics.spo2_percent %}
-                                    {{ latest_biometrics.spo2_percent|floatformat:0 }}
-                                {% else %}
-                                    --
+                    <div class="row">
+                        <!-- Nickname -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_nickname" class="form-label">Nickname *</label>
+                                <input type="text" id="id_nickname" name="nickname" class="form-control-custom" 
+                                       value="{{ form.nickname.value|default:animal.nickname }}" required>
+                                {% if form.nickname.errors %}
+                                    <div class="error-text">{{ form.nickname.errors }}</div>
                                 {% endif %}
                             </div>
-                            <small class="text-muted">SpO2%</small>
                         </div>
-                        <div class="col-4">
-                            <div class="display-6 fw-bold {% if latest_biometrics.body_temperature_c and latest_biometrics.body_temperature_c > 40 or latest_biometrics.body_temperature_c < 35 %}text-danger{% else %}text-warning{% endif %}" id="temp-display">
-                                {% if latest_biometrics.body_temperature_c %}
-                                    {{ latest_biometrics.body_temperature_c|floatformat:1 }}
-                                {% else %}
-                                    --
+
+                        <!-- Species -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_species" class="form-label">Species</label>
+                                <select id="id_species" name="species" class="form-control-custom">
+                                    <option value="">-- Select Species --</option>
+                                    {% for species in form.fields.species.queryset %}
+                                        <option value="{{ species.pk }}" 
+                                            {% if form.species.value|stringformat:"s" == species.pk|stringformat:"s" or animal.species_id == species.pk %}selected{% endif %}>
+                                            {{ species.common_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.species.errors %}
+                                    <div class="error-text">{{ form.species.errors }}</div>
                                 {% endif %}
                             </div>
-                            <small class="text-muted">°C</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Accelerometer -->
-                    <div class="bg-light rounded p-2 text-center mb-2">
-                        <small class="text-muted"><i class="bi bi-activity"></i> Accelerometer</small>
-                        <div class="font-monospace small" id="accel-display">
-                            X:{{ latest_biometrics.accel_x|default:"-" }} 
-                            Y:{{ latest_biometrics.accel_y|default:"-" }} 
-                            Z:{{ latest_biometrics.accel_z|default:"-" }}
                         </div>
                     </div>
 
-                    <!-- Sensor Status -->
-                    {% if latest_biometrics.sensor_status != 'OK' %}
-                        <div class="alert alert-warning py-2 mb-0">
-                            <i class="bi bi-exclamation-triangle"></i> 
-                            <strong>Sensor:</strong> {{ latest_biometrics.sensor_status }}
+                    <div class="row">
+                        <!-- Gender -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_gender" class="form-label">Gender</label>
+                                <select id="id_gender" name="gender" class="form-control-custom">
+                                    {% for value, label in form.fields.gender.choices %}
+                                        <option value="{{ value }}" 
+                                            {% if form.gender.value == value or animal.gender == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Birth Year -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_birth_year" class="form-label">Birth Year</label>
+                                <input type="number" id="id_birth_year" name="birth_year" class="form-control-custom" 
+                                       value="{{ form.birth_year.value|default:animal.birth_year|default:'' }}"
+                                       placeholder="e.g. 2019">
+                                <div class="help-text">Estimated year of birth</div>
+                            </div>
+                        </div>
+
+                        <!-- Weight -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_weight" class="form-label">Weight (kg)</label>
+                                <input type="number" id="id_weight" name="weight" class="form-control-custom" step="0.01"
+                                       value="{{ form.weight.value|default:animal.weight|default:'' }}"
+                                       placeholder="e.g. 150.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Health Status -->
+                    <div class="form-group">
+                        <label for="id_health_status" class="form-label">Health Status</label>
+                        <input type="text" id="id_health_status" name="health_status" class="form-control-custom" 
+                               value="{{ form.health_status.value|default:animal.health_status }}"
+                               placeholder="e.g. Healthy, Injured, Monitoring">
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="id_notes" class="form-label">Notes</label>
+                        <textarea id="id_notes" name="notes" class="form-control-custom" 
+                                  placeholder="Additional observations, medical history, behavioral notes...">{{ form.notes.value|default:animal.notes }}</textarea>
+                    </div>
+
+                    <!-- Tag Assignment (if admin) -->
+                    {% if user.userprofile.is_admin %}
+                    <div class="form-group">
+                        <label class="form-label">Current Tag</label>
+                        {% if animal.active_tag %}
+                            <div class="animal-id-display">
+                                <i class="bi bi-wifi me-2"></i>{{ animal.active_tag.tag_serial_number }}
+                                <span class="ms-2" style="color: #42e695;">● Active</span>
+                            </div>
+                            <div class="help-text mt-2">Tag assigned via the Tags page</div>
+                        {% else %}
+                            <div class="animal-id-display" style="color: #ffc107;">
+                                <i class="bi bi-wifi-off me-2"></i>No tag assigned
+                            </div>
+                            <div class="help-text mt-2">
+                                <a href="{% url 'tag_list' %}" style="color: #0dcaf0;">Go to Tags → Assign a tag to this animal</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Form Errors -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" style="background: rgba(220,53,69,0.2); border: 1px solid rgba(220,53,69,0.3); color: #ff6b6b; border-radius: 12px; padding: 15px;">
+                            {{ form.non_field_errors }}
                         </div>
                     {% endif %}
-                    
-                    <small class="text-muted d-block mt-2 text-center">
-                        <i class="bi bi-clock"></i> Last update: <span id="last-update">{{ latest_biometrics.timestamp|timesince }}</span> ago
-                    </small>
-                {% else %}
-                    <div class="text-center py-3">
-                        <i class="bi bi-heart-pulse display-4 text-muted"></i>
-                        <p class="text-muted mt-2">No biometric data available.</p>
-                        <small class="text-muted">Waiting for IoT device connection...</small>
+
+                    <!-- Buttons -->
+                    <div class="d-flex align-items-center mt-4">
+                        <button type="submit" class="btn-save">
+                            <i class="bi bi-check-lg me-2"></i>Update Animal
+                        </button>
+                        <a href="{% url 'animal_detail' animal.animal_id %}" class="btn-cancel">
+                            <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>
                     </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-8">
-        <!-- Location History Card -->
-        <div class="card shadow mb-4 card-animated">
-            <div class="card-header bg-success text-white d-flex justify-content-between">
-                <h5 class="mb-0">Location History</h5>
-                <div>
-                    <a href="{% url 'location_history' animal.animal_id %}" class="btn btn-sm btn-light btn-animated">View All</a>
-                    <button onclick="getWeather({{ animal.animal_id }})" class="btn btn-sm btn-info btn-animated">Weather</button>
-                    <button onclick="predictNext({{ animal.animal_id }})" class="btn btn-sm btn-warning btn-animated">Predict</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="weather-info" class="alert alert-info d-none"></div>
-                <div id="prediction-info" class="alert alert-warning d-none"></div>
-                {% if locations %}
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Latitude</th>
-                                    <th>Longitude</th>
-                                    <th>Speed</th>
-                                    <th>Temp</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for loc in locations|slice:":10" %}
-                                <tr class="table-row-animated">
-                                    <td>{{ loc.timestamp }}</td>
-                                    <td>{{ loc.latitude }}</td>
-                                    <td>{{ loc.longitude }}</td>
-                                    <td>{{ loc.speed|default:"-" }} km/h</td>
-                                    <td>{{ loc.temperature|default:"-" }}°C</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-muted">No location history available.</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- BIOMETRIC HISTORY CHART -->
-        <div class="card shadow mb-4 card-animated">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Vitals History</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="vitalsChart" height="120"></canvas>
-            </div>
-        </div>
-
-        <!-- Recent Alerts Card -->
-        <div class="card shadow card-animated">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">Recent Alerts</h5>
-            </div>
-            <div class="card-body">
-                {% if alerts %}
-                    {% for alert in alerts %}
-                        <div class="alert alert-{% if alert.severity == 'CRITICAL' %}danger{% elif alert.severity == 'HIGH' %}danger{% elif alert.severity == 'MEDIUM' %}warning{% else %}info{% endif %}">
-                            <strong>{{ alert.alert_type }}</strong> - {{ alert.severity }}
-                            <p class="mb-0">{{ alert.message }}</p>
-                            <small class="text-muted">{{ alert.timestamp }}</small>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted">No alerts for this animal.</p>
-                {% endif %}
+                </form>
             </div>
         </div>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-// ============ WEATHER & PREDICTION ============
-function getWeather(animalId) {
-    fetch('/api/weather/' + animalId + '/')
-        .then(response => response.json())
-        .then(data => {
-            var info = document.getElementById('weather-info');
-            if (data.error) {
-                info.innerHTML = 'Weather data unavailable: ' + data.error;
-            } else {
-                info.innerHTML = '<strong>Current Weather:</strong> ' + data.description + 
-                    ', ' + data.temperature + '°C, Humidity: ' + data.humidity + 
-                    '%, Wind: ' + data.wind_speed + ' m/s';
-            }
-            info.classList.remove('d-none');
-        });
-}
-
-function predictNext(animalId) {
-    fetch('/api/predict/' + animalId + '/')
-        .then(response => response.json())
-        .then(data => {
-            var info = document.getElementById('prediction-info');
-            if (data.error) {
-                info.innerHTML = 'Prediction unavailable: ' + data.error;
-            } else {
-                info.innerHTML = '<strong>Predicted Next Location:</strong> Lat ' + 
-                    data.predicted_latitude.toFixed(6) + ', Lon ' + 
-                    data.predicted_longitude.toFixed(6);
-            }
-            info.classList.remove('d-none');
-        });
-}
-
-// ============ LIVE VITALS SSE STREAM (AUTO-RECONNECT) ============
-(function() {
-    let evtSource = null;
-    let reconnectAttempts = 0;
-    const maxReconnectDelay = 30000;
-    const animalId = {{ animal.animal_id }};
-    const statusBadge = document.getElementById('vitals-status');
-    
-    function updateStatus(text, className) {
-        if (statusBadge) {
-            statusBadge.textContent = text;
-            statusBadge.className = 'badge ' + className;
-        }
-    }
-    
-    function connect() {
-        if (evtSource) {
-            evtSource.close();
-        }
-        
-        updateStatus('Connecting...', 'bg-secondary text-white');
-        
-        evtSource = new EventSource('/api/vitals-stream/' + animalId + '/');
-        
-        evtSource.onopen = function() {
-            reconnectAttempts = 0;
-            updateStatus('Live', 'bg-light text-danger');
-        };
-        
-        evtSource.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            
-            if (data.reconnect) {
-                evtSource.close();
-                setTimeout(connect, 1000);
-                return;
-            }
-            
-            if (data.hr !== null && data.hr !== undefined) {
-                const hrEl = document.getElementById('hr-display');
-                if (hrEl) {
-                    hrEl.innerText = data.hr;
-                    hrEl.className = 'display-6 fw-bold ' + ((data.hr < 30 || data.hr > 150) ? 'text-danger' : 'text-success');
-                }
-            }
-            
-            if (data.spo2 !== null && data.spo2 !== undefined) {
-                const spo2El = document.getElementById('spo2-display');
-                if (spo2El) spo2El.innerText = Math.round(data.spo2);
-            }
-            
-            if (data.temp !== null && data.temp !== undefined) {
-                const tempEl = document.getElementById('temp-display');
-                if (tempEl) {
-                    tempEl.innerText = data.temp.toFixed(1);
-                    tempEl.className = 'display-6 fw-bold ' + ((data.temp > 40 || data.temp < 35) ? 'text-danger' : 'text-warning');
-                }
-            }
-            
-            if (data.accel_x !== undefined) {
-                const accelEl = document.getElementById('accel-display');
-                if (accelEl) {
-                    accelEl.innerText = 'X:' + data.accel_x + ' Y:' + data.accel_y + ' Z:' + data.accel_z;
-                }
-            }
-            
-            const lastUpdateEl = document.getElementById('last-update');
-            if (lastUpdateEl) {
-                lastUpdateEl.innerText = 'Just now';
-            }
-        };
-        
-        evtSource.onerror = function() {
-            evtSource.close();
-            updateStatus('Reconnecting...', 'bg-warning text-dark');
-            
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
-            reconnectAttempts++;
-            
-            setTimeout(connect, delay);
-        };
-    }
-    
-    connect();
-    
-    window.addEventListener('beforeunload', function() {
-        if (evtSource) evtSource.close();
-    });
-})();
-
-// ============ VITALS HISTORY CHART ============
-{% if biometric_history %}
-const ctx = document.getElementById('vitalsChart').getContext('2d');
-const vitalsChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: [{% for b in biometric_history reversed %}'{{ b.timestamp|date:"H:i" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-            label: 'Heart Rate (BPM)',
-            data: [{% for b in biometric_history reversed %}{{ b.heart_rate_bpm|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            borderColor: '#dc3545',
-            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-            tension: 0.4,
-            fill: true
-        }, {
-            label: 'SpO2 (%)',
-            data: [{% for b in biometric_history reversed %}{{ b.spo2_percent|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            borderColor: '#0dcaf0',
-            backgroundColor: 'rgba(13, 202, 240, 0.1)',
-            tension: 0.4,
-            fill: true,
-            yAxisID: 'y1'
-        }, {
-            label: 'Temp (°C)',
-            data: [{% for b in biometric_history reversed %}{{ b.body_temperature_c|default:"null" }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            borderColor: '#ffc107',
-            backgroundColor: 'rgba(255, 193, 7, 0.1)',
-            tension: 0.4,
-            fill: true,
-            yAxisID: 'y1'
-        }]
-    },
-    options: {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-            y: { beginAtZero: false, title: { display: true, text: 'HR (BPM)' } },
-            y1: { position: 'right', beginAtZero: false, title: { display: true, text: 'SpO2% / °C' } }
-        }
-    }
-});
-{% endif %}
-</script>
 {% endblock %}

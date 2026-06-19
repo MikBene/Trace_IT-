@@ -341,11 +341,11 @@
     </div>
 </div>
 
-<!-- Stats Row -->
+<!-- Stats Row - FIXED: Uses actual counts from view, NOT string length -->
 <div class="row mb-4 fade-in-up delay-1">
     <div class="col-md-3 col-6 mb-3">
         <div class="stat-card">
-            <div class="stat-number" id="stat-animals">{{ locations_data|length }}</div>
+            <div class="stat-number" id="stat-animals">{{ total_animals }}</div>
             <div class="stat-label">Tracked Animals</div>
         </div>
     </div>
@@ -357,7 +357,7 @@
     </div>
     <div class="col-md-3 col-6 mb-3">
         <div class="stat-card">
-            <div class="stat-number" id="stat-with-location">0</div>
+            <div class="stat-number" id="stat-with-location">{{ animals_with_gps }}</div>
             <div class="stat-label">With GPS Data</div>
         </div>
     </div>

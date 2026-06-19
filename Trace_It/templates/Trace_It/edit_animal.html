@@ -2,18 +2,265 @@
 
 {% block title %}Edit {{ animal.nickname }} - TRACE IT{% endblock %}
 
-{% block content %}
-<h2>Edit {{ animal.nickname }}</h2>
+{% block extra_css %}
+<style>
+    .edit-form-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    .edit-form-header {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        padding: 25px;
+        color: white;
+    }
+    .edit-form-header h3 {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 2px;
+    }
+    .edit-form-body {
+        padding: 30px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-label {
+        display: block;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 14px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .form-control-custom {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 14px 18px;
+        color: white;
+        font-size: 15px;
+        width: 100%;
+        transition: all 0.3s;
+    }
+    .form-control-custom:focus {
+        outline: none;
+        border-color: #198754;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.2);
+        background: rgba(255, 255, 255, 0.12);
+    }
+    .form-control-custom::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+    }
+    select.form-control-custom {
+        appearance: auto;
+        color: white;
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+    select.form-control-custom option {
+        background: #0a0e27;
+        color: white;
+    }
+    textarea.form-control-custom {
+        min-height: 100px;
+        resize: vertical;
+    }
+    .btn-save {
+        background: linear-gradient(135deg, #198754, #146c43);
+        border: none;
+        color: white;
+        padding: 14px 30px;
+        border-radius: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
+    }
+    .btn-cancel {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 14px 30px;
+        border-radius: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    .btn-cancel:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        color: white;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .animal-id-display {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 16px;
+        display: inline-block;
+        font-family: 'Orbitron', monospace;
+        color: #0dcaf0;
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+    .help-text {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    .error-text {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+</style>
+{% endblock %}
 
+{% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow card-animated">
-            <div class="card-body">
+    <div class="col-lg-8">
+        <div class="edit-form-card">
+            <div class="edit-form-header">
+                <h3><i class="bi bi-pencil-square me-2"></i>Edit Animal</h3>
+                <p class="mb-0 mt-2 opacity-75">Animal ID: <span class="animal-id-display">{{ animal.animal_id }}</span></p>
+            </div>
+            <div class="edit-form-body">
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-success btn-animated">Update Animal</button>
-                    <a href="{% url 'animal_detail' animal.animal_id %}" class="btn btn-outline-secondary btn-animated">Cancel</a>
+
+                    <div class="row">
+                        <!-- Nickname -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_nickname" class="form-label">Nickname *</label>
+                                <input type="text" id="id_nickname" name="nickname" class="form-control-custom" 
+                                       value="{{ form.nickname.value|default:animal.nickname }}" required>
+                                {% if form.nickname.errors %}
+                                    <div class="error-text">{{ form.nickname.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Species -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="id_species" class="form-label">Species</label>
+                                <select id="id_species" name="species" class="form-control-custom">
+                                    <option value="">-- Select Species --</option>
+                                    {% for species in form.fields.species.queryset %}
+                                        <option value="{{ species.pk }}" 
+                                            {% if form.species.value|stringformat:"s" == species.pk|stringformat:"s" or animal.species_id == species.pk %}selected{% endif %}>
+                                            {{ species.common_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.species.errors %}
+                                    <div class="error-text">{{ form.species.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Gender -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_gender" class="form-label">Gender</label>
+                                <select id="id_gender" name="gender" class="form-control-custom">
+                                    {% for value, label in form.fields.gender.choices %}
+                                        <option value="{{ value }}" 
+                                            {% if form.gender.value == value or animal.gender == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Birth Year -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_birth_year" class="form-label">Birth Year</label>
+                                <input type="number" id="id_birth_year" name="birth_year" class="form-control-custom" 
+                                       value="{{ form.birth_year.value|default:animal.birth_year|default:'' }}"
+                                       placeholder="e.g. 2019">
+                                <div class="help-text">Estimated year of birth</div>
+                            </div>
+                        </div>
+
+                        <!-- Weight -->
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="id_weight" class="form-label">Weight (kg)</label>
+                                <input type="number" id="id_weight" name="weight" class="form-control-custom" step="0.01"
+                                       value="{{ form.weight.value|default:animal.weight|default:'' }}"
+                                       placeholder="e.g. 150.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Health Status -->
+                    <div class="form-group">
+                        <label for="id_health_status" class="form-label">Health Status</label>
+                        <input type="text" id="id_health_status" name="health_status" class="form-control-custom" 
+                               value="{{ form.health_status.value|default:animal.health_status }}"
+                               placeholder="e.g. Healthy, Injured, Monitoring">
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="id_notes" class="form-label">Notes</label>
+                        <textarea id="id_notes" name="notes" class="form-control-custom" 
+                                  placeholder="Additional observations, medical history, behavioral notes...">{{ form.notes.value|default:animal.notes }}</textarea>
+                    </div>
+
+                    <!-- Tag Assignment (if admin) -->
+                    {% if user.userprofile.is_admin %}
+                    <div class="form-group">
+                        <label class="form-label">Current Tag</label>
+                        {% if animal.active_tag %}
+                            <div class="animal-id-display">
+                                <i class="bi bi-wifi me-2"></i>{{ animal.active_tag.tag_serial_number }}
+                                <span class="ms-2" style="color: #42e695;">● Active</span>
+                            </div>
+                            <div class="help-text mt-2">Tag assigned via the Tags page</div>
+                        {% else %}
+                            <div class="animal-id-display" style="color: #ffc107;">
+                                <i class="bi bi-wifi-off me-2"></i>No tag assigned
+                            </div>
+                            <div class="help-text mt-2">
+                                <a href="{% url 'tag_list' %}" style="color: #0dcaf0;">Go to Tags → Assign a tag to this animal</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Form Errors -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" style="background: rgba(220,53,69,0.2); border: 1px solid rgba(220,53,69,0.3); color: #ff6b6b; border-radius: 12px; padding: 15px;">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <!-- Buttons -->
+                    <div class="d-flex align-items-center mt-4">
+                        <button type="submit" class="btn-save">
+                            <i class="bi bi-check-lg me-2"></i>Update Animal
+                        </button>
+                        <a href="{% url 'animal_detail' animal.animal_id %}" class="btn-cancel">
+                            <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>
+                    </div>
                 </form>
             </div>
         </div>

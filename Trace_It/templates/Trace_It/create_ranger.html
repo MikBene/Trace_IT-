@@ -115,22 +115,21 @@
         margin-right: 10px;
     }
 
-    /* ─── Form Styles ─── */
-    .ranger-form .form-control, .ranger-form .form-label {
-        color: #2d3748 !important;
-        font-weight: 500;
-    }
+    /* ─── Form Styles - FIXED: Visible labels, proper contrast ─── */
     .ranger-form .form-control {
         background: #fff;
         border: 2px solid #e2e8f0;
         padding: 12px 16px;
         font-size: 15px;
         color: #2d3748 !important;
+        border-radius: 8px;
+        width: 100%;
     }
     .ranger-form .form-control:focus {
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
         color: #2d3748 !important;
+        outline: none;
     }
     .ranger-form .form-control::placeholder {
         color: #a0aec0;
@@ -139,7 +138,9 @@
     .ranger-form .form-label {
         font-weight: 600;
         margin-bottom: 8px;
-        color: #4a5568;
+        color: #2d3748;
+        display: block;
+        font-size: 14px;
     }
     .required-field::after {
         content: " *";
@@ -148,6 +149,7 @@
     .form-text {
         font-size: 12px;
         color: #718096;
+        margin-top: 4px;
     }
 
     /* ─── Cards & Headers ─── */
@@ -277,11 +279,11 @@
             margin: 10px;
             max-width: 100%;
         }
-        
+
         .modal-body {
             padding: 15px;
         }
-        
+
         button[type="submit"], 
         .btn-animated {
             min-height: 48px;
@@ -289,28 +291,24 @@
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
-        
-        /* Ensure modal is above backdrop */
+
         .modal {
             z-index: 1050;
         }
-        
+
         .modal-backdrop {
             z-index: 1040;
         }
-        
-        /* Fix for iOS Safari */
+
         .modal-content {
             -webkit-overflow-scrolling: touch;
         }
-        
-        /* Make action buttons bigger on mobile */
+
         .btn-action {
             padding: 12px 18px;
             font-size: 14px;
         }
-        
-        /* Ensure forms in modals are clickable */
+
         .modal form {
             position: relative;
             z-index: 1;
@@ -355,16 +353,16 @@
                 <div class="row">
                     <!-- Email -->
                     <div class="col-md-6 mb-3">
-                        <label class="form-label required-field">Email Address</label>
-                        <input type="email" name="email" class="form-control" required 
+                        <label for="create-email" class="form-label required-field">Email Address</label>
+                        <input type="email" id="create-email" name="email" class="form-control" required 
                                placeholder="ranger@traceit.com" value="{{ request.POST.email|default:'' }}">
                         <div class="form-text">This will be the ranger's login username</div>
                     </div>
 
                     <!-- Password -->
                     <div class="col-md-6 mb-3">
-                        <label class="form-label required-field">Password</label>
-                        <input type="password" name="password" class="form-control" required 
+                        <label for="create-password" class="form-label required-field">Password</label>
+                        <input type="password" id="create-password" name="password" class="form-control" required 
                                placeholder="Min 6 characters">
                     </div>
                 </div>
@@ -372,20 +370,20 @@
                 <div class="row">
                     <!-- First Name -->
                     <div class="col-md-4 mb-3">
-                        <label class="form-label">First Name</label>
-                        <input type="text" name="first_name" class="form-control" 
+                        <label for="create-firstname" class="form-label">First Name</label>
+                        <input type="text" id="create-firstname" name="first_name" class="form-control" 
                                placeholder="John" value="{{ request.POST.first_name|default:'' }}">
                     </div>
                     <!-- Last Name -->
                     <div class="col-md-4 mb-3">
-                        <label class="form-label">Last Name</label>
-                        <input type="text" name="last_name" class="form-control" 
+                        <label for="create-lastname" class="form-label">Last Name</label>
+                        <input type="text" id="create-lastname" name="last_name" class="form-control" 
                                placeholder="Doe" value="{{ request.POST.last_name|default:'' }}">
                     </div>
                     <!-- Phone -->
                     <div class="col-md-4 mb-3">
-                        <label class="form-label">Phone Number</label>
-                        <input type="tel" name="phone" class="form-control" 
+                        <label for="create-phone" class="form-label">Phone Number</label>
+                        <input type="tel" id="create-phone" name="phone" class="form-control" 
                                placeholder="+255 778 014 203" value="{{ request.POST.phone|default:'' }}">
                     </div>
                 </div>
@@ -553,7 +551,7 @@
                             </td>
                         </tr>
 
-                        <!-- Edit Modal for this user -->
+                        <!-- Edit Modal for this user - FIXED: Proper labels with for/id attributes -->
                         <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
@@ -570,8 +568,8 @@
                                             <div class="row">
                                                 <!-- Email -->
                                                 <div class="col-12 mb-3">
-                                                    <label class="form-label required-field">Email Address</label>
-                                                    <input type="email" name="email" class="form-control" required 
+                                                    <label for="edit-email-{{ user.id }}" class="form-label required-field">Email Address</label>
+                                                    <input type="email" id="edit-email-{{ user.id }}" name="email" class="form-control" required 
                                                            value="{{ user.email }}">
                                                 </div>
                                             </div>
@@ -579,29 +577,29 @@
                                             <div class="row">
                                                 <!-- First Name -->
                                                 <div class="col-md-6 mb-3">
-                                                    <label class="form-label">First Name</label>
-                                                    <input type="text" name="first_name" class="form-control" 
+                                                    <label for="edit-firstname-{{ user.id }}" class="form-label">First Name</label>
+                                                    <input type="text" id="edit-firstname-{{ user.id }}" name="first_name" class="form-control" 
                                                            value="{{ user.first_name|default:'' }}">
                                                 </div>
                                                 <!-- Last Name -->
                                                 <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Last Name</label>
-                                                    <input type="text" name="last_name" class="form-control" 
+                                                    <label for="edit-lastname-{{ user.id }}" class="form-label">Last Name</label>
+                                                    <input type="text" id="edit-lastname-{{ user.id }}" name="last_name" class="form-control" 
                                                            value="{{ user.last_name|default:'' }}">
                                                 </div>
                                             </div>
 
                                             <!-- Phone -->
                                             <div class="mb-3">
-                                                <label class="form-label">Phone Number</label>
-                                                <input type="tel" name="phone" class="form-control" 
+                                                <label for="edit-phone-{{ user.id }}" class="form-label">Phone Number</label>
+                                                <input type="tel" id="edit-phone-{{ user.id }}" name="phone" class="form-control" 
                                                        value="{{ user.userprofile.phone|default:'' }}">
                                             </div>
 
                                             <!-- New Password -->
                                             <div class="mb-3">
-                                                <label class="form-label">New Password</label>
-                                                <input type="password" name="password" class="form-control" 
+                                                <label for="edit-password-{{ user.id }}" class="form-label">New Password</label>
+                                                <input type="password" id="edit-password-{{ user.id }}" name="password" class="form-control" 
                                                        placeholder="Leave blank to keep current password">
                                                 <div class="form-text">Only fill this if you want to change the password</div>
                                             </div>
@@ -650,33 +648,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.target.style.transform = 'scale(0.95)';
             }
         }, {passive: true});
-        
+
         modal.addEventListener('touchend', function(e) {
             if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
                 e.target.style.transform = '';
             }
         }, {passive: true});
     });
-    
+
     // Ensure submit buttons are clickable and not blocked by modal
     document.querySelectorAll('.modal button[type="submit"]').forEach(function(btn) {
         btn.addEventListener('touchstart', function(e) {
             e.stopPropagation();
         }, {passive: true});
-        
-        // Prevent any parent elements from intercepting the click
+
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
-            // Let the form submit normally
         });
     });
-    
+
     // Fix for Bootstrap modal backdrop blocking clicks on mobile
     document.querySelectorAll('.modal').forEach(function(modal) {
         modal.addEventListener('shown.bs.modal', function() {
             document.body.style.overflow = 'hidden';
         });
-        
+
         modal.addEventListener('hidden.bs.modal', function() {
             document.body.style.overflow = '';
         });

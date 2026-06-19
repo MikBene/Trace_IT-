@@ -20,6 +20,29 @@ import traceback
 logger = logging.getLogger(__name__)
 
 
+# ===== AUTO-GENERATED ANIMAL ID =====
+
+def generate_animal_id():
+    """Generate next auto-incrementing animal ID like ANM-2026-0001"""
+    from datetime import datetime
+    year = datetime.now().year
+    prefix = f"ANM-{year}-"
+    
+    # Find the highest existing ID for this year
+    existing = Animal.objects.filter(animal_id__startswith=prefix).order_by('-animal_id').first()
+    
+    if existing:
+        try:
+            last_num = int(existing.animal_id.split('-')[-1])
+            next_num = last_num + 1
+        except (ValueError, IndexError):
+            next_num = 1
+    else:
+        next_num = 1
+    
+    return f"{prefix}{next_num:04d}"
+
+
 # ===== UTILITY FUNCTIONS =====
 
 def log_action(user, action, details):
@@ -199,7 +222,7 @@ def check_geofence_violations(animal, location):
 
 
 def check_stationary_alert(animal):
-    if animal.is_stationary(minutes=90):
+    if animal.is_stationary_minutes(minutes=90):
         Alert.objects.get_or_create(
             animal=animal,
             alert_type='STATIONARY',
@@ -330,7 +353,6 @@ def logout_view(request):
 @login_required
 def index(request):
     """Home page showing all animals with their latest data."""
-    animals = []
     animal_data = []
     total_animals = 0
 
@@ -343,47 +365,63 @@ def index(request):
         return render(request, 'Trace_It/index.html', {
             'animal_data': [],
             'total_animals': 0,
+            'active_trackers': 0,
+            'alerts_today': 0,
+            'total_geofences': 0,
             'debug': settings.DEBUG
         })
 
     for animal in animals:
         try:
-            latest_location = None
-            latest_biometrics = None
-            battery_level = None
-
-            try:
-                latest_location = animal.get_latest_location()
-            except Exception as e:
-                logger.warning(f"No location for animal {animal.animal_id}: {e}")
-
-            try:
-                latest_biometrics = animal.get_latest_biometrics()
-            except Exception as e:
-                logger.warning(f"No biometrics for animal {animal.animal_id}: {e}")
-
+            # Get latest location
+            latest_location = animal.get_latest_location()
+            
+            # Get active deployment & tag info
+            deployment = animal.deployment_set.filter(is_active=True).first()
+            has_tracker = deployment is not None
+            tracker_id = deployment.tag.tag_serial_number if (deployment and deployment.tag) else None
+            battery_level = deployment.tag.battery_level if (deployment and deployment.tag) else None
+            
+            # Determine status
             if latest_location:
-                try:
-                    tag = latest_location.tag
-                    battery_level = tag.battery_level if tag else None
-                except Exception:
-                    pass
+                time_diff = timezone.now() - latest_location.timestamp
+                if time_diff.total_seconds() < 3600:  # Active if location within 1 hour
+                    status = 'active'
+                else:
+                    status = 'inactive'
+            else:
+                status = 'inactive'
 
             animal_data.append({
-                'animal': animal,
-                'latest_location': latest_location,
-                'latest_biometrics': latest_biometrics,
+                'id': animal.animal_id,
+                'animal_id': animal.animal_id,
+                'name': animal.nickname,
+                'species_name': animal.species.common_name if animal.species else 'Unknown',
+                'status': status,
+                'has_tracker': has_tracker,
+                'tracker_id': tracker_id,
                 'battery_level': battery_level,
-                'status': 'Active' if latest_location else 'Inactive',
+                'last_seen': latest_location.timestamp if latest_location else None,
                 'health_status': animal.health_status or 'Unknown',
             })
         except Exception as e:
             logger.error(f"Error processing animal {animal.animal_id}: {e}")
             continue
 
+    # Calculate stats
+    active_trackers = sum(1 for a in animal_data if a['has_tracker'])
+    alerts_today = Alert.objects.filter(
+        timestamp__date=timezone.now().date(),
+        is_resolved=False
+    ).count()
+    total_geofences = Geofence.objects.filter(is_active=True).count()
+
     context = {
         'animal_data': animal_data,
         'total_animals': total_animals,
+        'active_trackers': active_trackers,
+        'alerts_today': alerts_today,
+        'total_geofences': total_geofences,
         'debug': settings.DEBUG
     }
     return render(request, 'Trace_It/index.html', context)
@@ -393,7 +431,6 @@ def index(request):
 @admin_required
 def dashboard(request):
     """Admin dashboard with stats and overview."""
-    # Default values for all context variables
     context = {
         'total_animals': 0,
         'total_tags': 0,
@@ -429,7 +466,6 @@ def dashboard(request):
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
         messages.error(request, f'Dashboard error: {str(e)}')
-        # Return context with defaults instead of empty dict
 
     return render(request, 'Trace_It/dashboard.html', context)
 
@@ -496,7 +532,24 @@ def add_animal(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    animal = form.save()
+                    animal = form.save(commit=False)
+                    # Auto-generate animal_id if not provided
+                    if not animal.animal_id:
+                        animal.animal_id = generate_animal_id()
+                    animal.save()
+                    
+                    # Auto-attach an unassigned ESP32 tag if available
+                    unassigned_tag = TrackingTag.objects.filter(is_assigned=False).first()
+                    if unassigned_tag:
+                        Deployment.objects.create(
+                            animal=animal,
+                            tag=unassigned_tag,
+                            is_active=True
+                        )
+                        unassigned_tag.is_assigned = True
+                        unassigned_tag.save()
+                        messages.info(request, f'Auto-attached tag {unassigned_tag.tag_serial_number} to {animal.nickname}.')
+                    
                 log_action(request.user, 'CREATE_ANIMAL', f'Added animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" added successfully.')
                 return redirect('index')
@@ -507,6 +560,8 @@ def add_animal(request):
             messages.error(request, 'Please fix the errors below.')
     else:
         form = AnimalForm(user=request.user)
+        # Pre-fill with auto-generated ID for display
+        form.fields['animal_id'].initial = generate_animal_id()
 
     return render(request, 'Trace_It/add_animal.html', {'form': form})
 
@@ -546,8 +601,12 @@ def delete_animal(request, animal_id):
         try:
             nickname = animal.nickname or f"Animal {animal.animal_id}"
 
-            deployments = Deployment.objects.filter(animal=animal)
+            # Deactivate deployments instead of deleting (keep history)
+            deployments = Deployment.objects.filter(animal=animal, is_active=True)
             for dep in deployments:
+                dep.is_active = False
+                dep.end_date = timezone.now()
+                dep.save()
                 if dep.tag:
                     dep.tag.is_assigned = False
                     dep.tag.save()
@@ -785,15 +844,17 @@ def location_history(request, animal_id):
 @login_required
 @ranger_required
 def map_view(request):
-    """Show ALL animals on the map, including those with tags but no location data yet."""
+    """Show ALL animals on the map with proper counts."""
     try:
         animals = Animal.objects.all().select_related('species')
         locations_data = []
+        animals_with_gps = 0
 
         for animal in animals:
             try:
                 loc = animal.get_latest_location()
-                if loc:
+                if loc and loc.latitude and loc.longitude:
+                    animals_with_gps += 1
                     locations_data.append({
                         'id': animal.animal_id,
                         'nickname': animal.nickname,
@@ -802,7 +863,7 @@ def map_view(request):
                         'longitude': float(loc.longitude),
                         'speed': float(loc.speed) if loc.speed else 0,
                         'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
-                        'stationary': False,  # Simplified to avoid model method issues
+                        'stationary': animal.is_stationary_minutes(90),
                     })
                 else:
                     locations_data.append({
@@ -823,10 +884,13 @@ def map_view(request):
         demo_geofences = Geofence.objects.filter(name__startswith='Demo Fence').exists()
         locations_json = json.dumps(locations_data)
 
+        # FIX: Pass actual integer counts, NOT the JSON string length!
         context = {
             'locations_data': locations_json,
             'geofences': geofences,
             'demo_geofences': demo_geofences,
+            'total_animals': animals.count(),           # REAL count
+            'animals_with_gps': animals_with_gps,       # REAL count
         }
         return render(request, 'Trace_It/map_view.html', context)
     except Exception as e:
@@ -836,6 +900,8 @@ def map_view(request):
             'locations_data': '[]',
             'geofences': [],
             'demo_geofences': False,
+            'total_animals': 0,
+            'animals_with_gps': 0,
         })
 
 
@@ -893,6 +959,7 @@ def export_alerts_csv(request):
     log_action(request.user, 'EXPORT_ALERTS_CSV', 'Exported alerts to CSV')
     return response
 
+
 @login_required
 @admin_required
 def export_alerts(request):
@@ -902,6 +969,7 @@ def export_alerts(request):
         'message': 'Export functionality coming soon',
         'alerts': []
     })
+
 
 @login_required
 @admin_required
@@ -1020,8 +1088,19 @@ def manage_users(request):
             return redirect('manage_users')
 
     users = User.objects.all().select_related('userprofile').order_by('email')
+    
+    # Calculate stats for the template
+    total_users = users.count()
+    admin_count = users.filter(userprofile__role='ADMIN').count()
+    ranger_count = users.filter(userprofile__role='RANGER').count()
+    active_count = users.filter(is_active=True).count()
+    
     context = {
         'users': users,
+        'total_users': total_users,
+        'admin_count': admin_count,
+        'ranger_count': ranger_count,
+        'active_count': active_count,
     }
     return render(request, 'Trace_It/manage_users.html', context)
 
