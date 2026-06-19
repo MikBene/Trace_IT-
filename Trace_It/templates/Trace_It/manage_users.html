@@ -46,13 +46,11 @@
                         </td>
                         <td>
                             <div class="d-flex gap-2">
-                                <!-- Edit Button -->
                                 <button type="button" class="btn btn-sm btn-primary btn-animated" 
                                         data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
                                     <i class="bi bi-pencil"></i> Edit
                                 </button>
 
-                                <!-- Change Role -->
                                 <form method="post" action="{% url 'toggle_user_role' user.id %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-warning btn-animated" 
@@ -61,7 +59,6 @@
                                     </button>
                                 </form>
 
-                                <!-- Delete -->
                                 <form method="post" action="{% url 'toggle_user_status' user.id %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-danger btn-animated" 
@@ -84,7 +81,7 @@
 </div>
 
 <!-- ============================================ -->
-<!-- ALL EDIT MODALS MOVED OUTSIDE THE TABLE      -->
+<!-- ALL EDIT MODALS OUTSIDE THE TABLE            -->
 <!-- ============================================ -->
 {% for user in users %}
 <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1" aria-hidden="true">
