@@ -16,21 +16,30 @@ SECRET_KEY = os.environ.get(
 # Set False in production
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
+# ─── RAILWAY PROXY FIX: Trust headers from Railway's reverse proxy ───
+# This tells Django to trust the X-Forwarded-Proto header sent by Railway
+# so it knows requests are HTTPS even though they arrive as HTTP internally
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+# ─── ALLOWED HOSTS ───
+# NEVER use '*' in production. It breaks CSRF origin checking.
+# Use your exact Railway domain + localhost for development
 ALLOWED_HOSTS = [
     'traceit-web.up.railway.app',
     'localhost',
     '127.0.0.1',
-    '*',
 ]
 
+# ─── CSRF TRUSTED ORIGINS ───
+# Must match your HTTPS domain exactly. Wildcards work in Django 4.0+
 CSRF_TRUSTED_ORIGINS = [
     'https://traceit-web.up.railway.app',
-    'http://traceit-web.up.railway.app',
     'https://localhost',
     'http://localhost',
 ]
 
-# ─── AUTH REDIRECTS (stay on same site, no new windows) ───
+# ─── AUTH REDIRECTS ───
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
@@ -126,6 +135,16 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    SECURE_SSL_REDIRECT = False  # Railway handles HTTPS
+
+    # Railway handles HTTPS termination at the edge proxy, so we don't redirect
+    # internally (would cause infinite loops). The proxy sends X-Forwarded-Proto.
+    SECURE_SSL_REDIRECT = False
+
+    # Cookies are secure because the browser sees HTTPS (Railway edge)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+    # HSTS: Tell browsers to always use HTTPS for this domain (1 year)
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
