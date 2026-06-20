@@ -1077,8 +1077,86 @@ def audit_log(request):
 @admin_required
 def manage_users(request):
     """Provide administrative view for managing infrastructure profiles, staff roles, and access controls."""
-    profiles = UserProfile.objects.all().select_related('user').order_by('role')
-    return render(request, 'Trace_It/manage_users.html', {'profiles': profiles})
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+
+        if action == 'create_ranger':
+            email = request.POST.get('email', '').strip().lower()
+            password = request.POST.get('password', '')
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            phone = request.POST.get('phone', '').strip()
+            role = request.POST.get('role', 'RANGER')
+
+            if not email or not password:
+                messages.error(request, 'Email and password are required.')
+                return redirect('manage_users')
+
+            if User.objects.filter(email__iexact=email).exists():
+                messages.error(request, 'A user with this email already exists.')
+                return redirect('manage_users')
+
+            username = email.split('@')[0]
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        password=password,
+                        first_name=first_name,
+                        last_name=last_name
+                    )
+                    UserProfile.objects.create(user=user, role=role, phone=phone)
+                log_action(request.user, 'CREATE_USER', f'Created {role.lower()} account for {email}')
+                messages.success(request, f'{role.title()} account for {email} created successfully.')
+            except Exception as e:
+                messages.error(request, f'Error creating user: {str(e)}')
+            return redirect('manage_users')
+
+        elif action == 'edit_ranger':
+            user_id = request.POST.get('user_id')
+            if not user_id:
+                messages.error(request, 'User ID is required.')
+                return redirect('manage_users')
+
+            target_user = get_object_or_404(User, pk=user_id)
+            email = request.POST.get('email', '').strip().lower()
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            phone = request.POST.get('phone', '').strip()
+            password = request.POST.get('password', '')
+
+            if email and email != target_user.email:
+                if User.objects.filter(email__iexact=email).exclude(pk=target_user.pk).exists():
+                    messages.error(request, 'Another user with this email already exists.')
+                    return redirect('manage_users')
+                target_user.email = email
+
+            target_user.first_name = first_name
+            target_user.last_name = last_name
+
+            if password:
+                target_user.password = make_password(password)
+
+            try:
+                target_user.save()
+                profile = target_user.userprofile
+                profile.phone = phone
+                profile.save()
+                log_action(request.user, 'UPDATE_USER', f'Updated user {target_user.email}')
+                messages.success(request, f'User {target_user.email} updated successfully.')
+            except Exception as e:
+                messages.error(request, f'Error updating user: {str(e)}')
+            return redirect('manage_users')
+
+    users = User.objects.all().select_related('userprofile').order_by('userprofile__role', 'email')
+    return render(request, 'Trace_It/manage_users.html', {'users': users})
 
 
 @login_required
