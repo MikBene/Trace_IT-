@@ -393,7 +393,6 @@ def index(request):
                 status = 'inactive'
 
             animal_data.append({
-                'id': animal.animal_id,
                 'animal_id': animal.animal_id,
                 'name': animal.nickname,
                 'species_name': animal.species.common_name if animal.species else 'Unknown',
