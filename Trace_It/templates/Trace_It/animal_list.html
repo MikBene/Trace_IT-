@@ -1,0 +1,324 @@
+{% extends 'Trace_It/base.html' %}
+
+{% block title %}Animal List - TRACE IT{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        padding: 30px;
+        border-radius: 20px;
+        margin-bottom: 30px;
+        color: white;
+    }
+    .page-header h2 {
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 2px;
+        margin: 0;
+    }
+    .filter-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+    .table-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    .table-custom {
+        width: 100%;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 0;
+    }
+    .table-custom th {
+        background: rgba(25, 135, 84, 0.2);
+        color: #0dcaf0;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 12px;
+        padding: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .table-custom td {
+        padding: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        vertical-align: middle;
+    }
+    .table-custom tbody tr {
+        transition: all 0.2s;
+    }
+    .table-custom tbody tr:hover {
+        background: rgba(25, 135, 84, 0.05);
+    }
+    .animal-id-badge {
+        font-family: 'Orbitron', monospace;
+        color: #0dcaf0;
+        font-size: 13px;
+        letter-spacing: 1px;
+    }
+    .status-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .status-healthy {
+        background: rgba(25, 135, 84, 0.2);
+        color: #42e695;
+        border: 1px solid rgba(25, 135, 84, 0.3);
+    }
+    .status-injured {
+        background: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    .status-sick {
+        background: rgba(220, 53, 69, 0.2);
+        color: #ff6b6b;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+    .status-unknown {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-edit {
+        background: linear-gradient(135deg, #198754, #146c43);
+        color: white;
+    }
+    .btn-edit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(25, 135, 84, 0.4);
+        color: white;
+    }
+    .btn-delete {
+        background: linear-gradient(135deg, #dc3545, #bb2d3b);
+        color: white;
+    }
+    .btn-delete:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        color: white;
+    }
+    .btn-view {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .btn-view:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+    .btn-add-animal {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        border: none;
+        color: white;
+        padding: 14px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+    }
+    .btn-add-animal:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(25, 135, 84, 0.4);
+        color: white;
+    }
+    .form-filter {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        padding: 10px 14px;
+        color: white;
+        font-size: 14px;
+    }
+    .form-filter:focus {
+        outline: none;
+        border-color: #198754;
+        background: rgba(255, 255, 255, 0.12);
+    }
+    .form-filter option {
+        background: #0a0e27;
+        color: white;
+    }
+    .tracker-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .tracker-active {
+        background: #42e695;
+        box-shadow: 0 0 8px #42e695;
+    }
+    .tracker-inactive {
+        background: rgba(255, 255, 255, 0.2);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: rgba(255, 255, 255, 0.4);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 15px;
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h2><i class="bi bi-list-ul me-2"></i>Animal Registry</h2>
+        <p class="mb-0 mt-2 opacity-75">Manage all tracked animals in the system</p>
+    </div>
+    <a href="{% url 'add_animal' %}" class="btn-add-animal">
+        <i class="bi bi-plus-lg"></i> Add Animal
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="filter-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label" style="color: rgba(255,255,255,0.7); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Filter by Status</label>
+            <select name="status" class="form-filter w-100">
+                <option value="">All Statuses</option>
+                <option value="Healthy" {% if status_filter == 'Healthy' %}selected{% endif %}>Healthy</option>
+                <option value="Injured" {% if status_filter == 'Injured' %}selected{% endif %}>Injured</option>
+                <option value="Sick" {% if status_filter == 'Sick' %}selected{% endif %}>Sick</option>
+                <option value="Monitoring" {% if status_filter == 'Monitoring' %}selected{% endif %}>Monitoring</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" style="color: rgba(255,255,255,0.7); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Filter by Species</label>
+            <select name="species" class="form-filter w-100">
+                <option value="">All Species</option>
+                {% for species in species_list %}
+                    <option value="{{ species.pk }}" {% if species_filter|stringformat:"s" == species.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ species.common_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn-add-animal w-100" style="padding: 10px 20px; font-size: 13px;">
+                <i class="bi bi-funnel me-2"></i>Apply Filters
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Animal Table -->
+<div class="table-card">
+    <div class="table-responsive">
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th>Animal ID</th>
+                    <th>Nickname</th>
+                    <th>Species</th>
+                    <th>Gender</th>
+                    <th>Health</th>
+                    <th>Tracker</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for animal in animals %}
+                <tr>
+                    <td>
+                        <span class="animal-id-badge">{{ animal.animal_id }}</span>
+                    </td>
+                    <td>
+                        <strong>{{ animal.nickname }}</strong>
+                    </td>
+                    <td>{{ animal.species.common_name|default:"Unknown" }}</td>
+                    <td>{{ animal.gender|default:"Unknown" }}</td>
+                    <td>
+                        {% with status=animal.health_status|default:"Unknown"|lower %}
+                            {% if "healthy" in status %}
+                                <span class="status-badge status-healthy">{{ animal.health_status|default:"Unknown" }}</span>
+                            {% elif "injured" in status or "monitor" in status %}
+                                <span class="status-badge status-injured">{{ animal.health_status }}</span>
+                            {% elif "sick" in status or "critical" in status %}
+                                <span class="status-badge status-sick">{{ animal.health_status }}</span>
+                            {% else %}
+                                <span class="status-badge status-unknown">{{ animal.health_status|default:"Unknown" }}</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>
+                        {% if animal.active_tag %}
+                            <span class="tracker-indicator tracker-active" title="Active: {{ animal.active_tag.tag_serial_number }}"></span>
+                            <small style="color: #42e695; margin-left: 4px;">{{ animal.active_tag.tag_serial_number }}</small>
+                        {% else %}
+                            <span class="tracker-indicator tracker-inactive" title="No tracker"></span>
+                            <small style="color: rgba(255,255,255,0.4); margin-left: 4px;">None</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="{% url 'animal_detail' animal.animal_id %}" class="btn-action btn-view" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{% url 'edit_animal' animal.animal_id %}" class="btn-action btn-edit" title="Edit Animal">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'delete_animal' animal.animal_id %}" class="btn-action btn-delete" title="Delete Animal"
+                               onclick="return confirm('Are you sure you want to delete {{ animal.nickname }}?');">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <h4>No animals found</h4>
+                            <p>Add your first animal to get started with tracking.</p>
+                            <a href="{% url 'add_animal' %}" class="btn-add-animal mt-3">
+                                <i class="bi bi-plus-lg"></i> Add First Animal
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

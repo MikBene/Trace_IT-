@@ -113,6 +113,17 @@
         font-size: 12px;
         margin-top: 4px;
     }
+    .animal-id-preview {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 16px;
+        display: inline-block;
+        font-family: 'Orbitron', monospace;
+        color: #0dcaf0;
+        font-size: 14px;
+        letter-spacing: 2px;
+        margin-bottom: 20px;
+    }
 </style>
 {% endblock %}
 
@@ -125,6 +136,9 @@
                 <p class="mb-0 mt-2 opacity-75">Register a new animal in the TRACE IT system</p>
             </div>
             <div class="add-form-body">
+                <div class="animal-id-preview">
+                    <i class="bi bi-upc-scan me-2"></i>Next ID: {{ form.initial.animal_id }}
+                </div>
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
 
@@ -221,6 +235,7 @@
                     <div class="form-group">
                         <label for="id_esp32_tag" class="form-label">Attach ESP32 Tag</label>
                         <select id="id_esp32_tag" name="esp32_tag" class="form-control-custom">
+                            <option value="">-- No Tag (Select Later) --</option>
                             {% for tag in form.fields.esp32_tag.queryset %}
                                 <option value="{{ tag.pk }}"
                                     {% if form.esp32_tag.value|stringformat:"s" == tag.pk|stringformat:"s" %}selected{% endif %}>
@@ -231,7 +246,7 @@
                             {% endfor %}
                         </select>
                         <div class="help-text">
-                            Select an unassigned tag to attach to this animal, or leave empty to assign later.
+                            Select an unassigned tag to attach to this animal, or leave empty to auto-assign later.
                         </div>
                     </div>
 
@@ -247,7 +262,7 @@
                         <button type="submit" class="btn-save">
                             <i class="bi bi-check-lg me-2"></i>Save Animal
                         </button>
-                        <a href="{% url 'index' %}" class="btn-cancel">
+                        <a href="{% url 'animal_list' %}" class="btn-cancel">
                             <i class="bi bi-x-lg me-2"></i>Cancel
                         </a>
                     </div>

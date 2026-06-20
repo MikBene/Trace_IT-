@@ -590,21 +590,24 @@ def add_animal(request):
                         animal.animal_id = generate_animal_id()
                     animal.save()
 
-                    # Auto-attach an unassigned ESP32 tag if available
-                    unassigned_tag = TrackingTag.objects.filter(is_assigned=False).first()
-                    if unassigned_tag:
-                        Deployment.objects.create(
-                            animal=animal,
-                            tag=unassigned_tag,
-                            is_active=True
-                        )
-                        unassigned_tag.is_assigned = True
-                        unassigned_tag.save()
-                        messages.info(request, f'Auto-attached tag {unassigned_tag.tag_serial_number} to {animal.nickname}.')
+                    # Handle tag from form (user-selected) - form.save() already handles tag assignment
+                    # Only auto-attach if user didn't select a tag AND unassigned tags exist
+                    esp32_tag = form.cleaned_data.get('esp32_tag')
+                    if not esp32_tag:
+                        unassigned_tag = TrackingTag.objects.filter(is_assigned=False).first()
+                        if unassigned_tag:
+                            Deployment.objects.create(
+                                animal=animal,
+                                tag=unassigned_tag,
+                                is_active=True
+                            )
+                            unassigned_tag.is_assigned = True
+                            unassigned_tag.save()
+                            messages.info(request, f'Auto-attached tag {unassigned_tag.tag_serial_number} to {animal.nickname}.')
 
                 log_action(request.user, 'CREATE_ANIMAL', f'Added animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" added successfully.')
-                return redirect('index')
+                return redirect('animal_list')
             except Exception as e:
                 logger.error(f"Error saving animal: {e}")
                 messages.error(request, f'Error saving animal: {str(e)}')
@@ -612,9 +615,7 @@ def add_animal(request):
             messages.error(request, 'Please fix the errors below.')
     else:
         form = AnimalForm(user=request.user)
-        # FIX: Pass initial animal_id via form initial dict, not via form.fields
-        # animal_id is auto-generated in Animal.save(), so no need to set it here
-        # But if you want to show a preview, pass it as initial data
+        # Show preview of next auto-generated ID
         form = AnimalForm(user=request.user, initial={'animal_id': generate_animal_id()})
 
     return render(request, 'Trace_It/add_animal.html', {'form': form})
@@ -633,7 +634,7 @@ def edit_animal(request, animal_id):
                     animal = form.save()
                 log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
-                return redirect('index')
+                return redirect('animal_list')
             except Exception as e:
                 logger.error(f"SAVE ERROR: {e}")
                 messages.error(request, f'Error saving: {str(e)}')
@@ -672,9 +673,10 @@ def delete_animal(request, animal_id):
             logger.error(f"DELETE ERROR: {e}")
             messages.error(request, f'Could not delete: {str(e)}')
 
-        return redirect('index')
+        return redirect('animal_list')
 
-    return redirect('index')
+    # GET request - show confirmation page
+    return render(request, 'Trace_It/delete_animal.html', {'animal': animal})
 
 
 @login_required
