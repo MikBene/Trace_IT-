@@ -306,6 +306,7 @@
         }
     </style>
 
+    <!-- REMOVED: <base target="_blank"> — this was forcing ALL links to open in new tabs -->
 <base target="_blank">
 </head>
 <body>
@@ -441,6 +442,35 @@
         }
     }
 </script>
+
+<!-- FORCE ALL LINKS TO OPEN IN SAME TAB — prevents any new window/tab from opening -->
+<script>
+(function() {
+    'use strict';
+
+    // Remove target="_blank" from all existing links on page load
+    document.querySelectorAll('a[target="_blank"]').forEach(function(link) {
+        link.removeAttribute('target');
+    });
+
+    // Intercept ALL clicks and force same-tab navigation
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('a');
+        if (link && link.getAttribute('target') === '_blank') {
+            e.preventDefault();
+            link.removeAttribute('target');
+            window.location.href = link.href;
+        }
+    });
+
+    // Block window.open() globally — no new windows/tabs allowed anywhere
+    window.open = function(url, target, features) {
+        if (url) window.location.href = url;
+        return window;
+    };
+})();
+</script>
+
 {% block extra_js %}{% endblock %}
 
 </body>
