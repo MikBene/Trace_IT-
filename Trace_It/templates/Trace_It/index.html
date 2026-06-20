@@ -1,17 +1,16 @@
-{% extends 'Trace_It/base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block title %}Home - Trace_It{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <!-- Stats Cards -->
     <div class="row mb-4">
         <div class="col-md-3 col-6 mb-3">
             <div class="card stat-card stat-card-green">
                 <div class="card-body text-center">
                     <span class="stat-icon">🦁</span>
-                    <h2 class="stat-number">{{ total_animals }}</h2>
+                    <h2 class="stat-number">{{ total_animals|default:0 }}</h2>
                     <div class="stat-label">Total Animals</div>
                 </div>
             </div>
@@ -20,7 +19,7 @@
             <div class="card stat-card stat-card-blue">
                 <div class="card-body text-center">
                     <span class="stat-icon">📡</span>
-                    <h2 class="stat-number">{{ active_trackers }}</h2>
+                    <h2 class="stat-number">{{ active_trackers|default:0 }}</h2>
                     <div class="stat-label">Active Trackers</div>
                 </div>
             </div>
@@ -29,7 +28,7 @@
             <div class="card stat-card stat-card-yellow">
                 <div class="card-body text-center">
                     <span class="stat-icon">⚠️</span>
-                    <h2 class="stat-number">{{ alerts_today }}</h2>
+                    <h2 class="stat-number">{{ alerts_today|default:0 }}</h2>
                     <div class="stat-label">Alerts Today</div>
                 </div>
             </div>
@@ -38,14 +37,13 @@
             <div class="card stat-card stat-card-purple">
                 <div class="card-body text-center">
                     <span class="stat-icon">🗺️</span>
-                    <h2 class="stat-number">{{ total_geofences }}</h2>
+                    <h2 class="stat-number">{{ total_geofences|default:0 }}</h2>
                     <div class="stat-label">Geofences</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Action Buttons -->
     <div class="row mb-4">
         <div class="col-12">
             <a href="{% url 'add_animal' %}" class="btn btn-primary btn-lg me-2 mb-2">
@@ -60,11 +58,10 @@
         </div>
     </div>
 
-    <!-- Animals List -->
     <div class="card section-card">
         <div class="card-header section-header-green d-flex justify-content-between align-items-center">
             <h4 class="mb-0"><i class="bi bi-paw me-2"></i> Tracked Animals</h4>
-            <span class="badge bg-light text-dark">{{ total_animals }} animals</span>
+            <span class="badge bg-light text-dark">{{ total_animals|default:0 }} animals</span>
         </div>
         <div class="card-body">
             {% if animal_data %}
