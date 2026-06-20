@@ -16,15 +16,15 @@ SECRET_KEY = os.environ.get(
 # Set False in production
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-# ─── RAILWAY PROXY FIX: Trust headers from Railway's reverse proxy ───
-# This tells Django to trust the X-Forwarded-Proto header sent by Railway
-# so it knows requests are HTTPS even though they arrive as HTTP internally
+# ─── RAILWAY PROXY FIX ───
+# Railway sits between the browser and Django. It sends HTTPS requests to the
+# browser but HTTP internally. These settings tell Django to trust Railway's
+# headers so it knows the original request was HTTPS.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
 # ─── ALLOWED HOSTS ───
 # NEVER use '*' in production. It breaks CSRF origin checking.
-# Use your exact Railway domain + localhost for development
 ALLOWED_HOSTS = [
     'traceit-web.up.railway.app',
     'localhost',
@@ -32,12 +32,21 @@ ALLOWED_HOSTS = [
 ]
 
 # ─── CSRF TRUSTED ORIGINS ───
-# Must match your HTTPS domain exactly. Wildcards work in Django 4.0+
+# Must be HTTPS only in production. Must match your exact domain.
 CSRF_TRUSTED_ORIGINS = [
     'https://traceit-web.up.railway.app',
     'https://localhost',
     'http://localhost',
 ]
+
+# ─── CSRF COOKIE SETTINGS ───
+# These fix issues where CSRF cookie isn't sent properly behind proxy
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # Must be False so JS can read it for AJAX
+CSRF_USE_SESSIONS = False     # Use separate CSRF cookie (not session)
+
+# ─── SESSION COOKIE SETTINGS ───
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # ─── AUTH REDIRECTS ───
 LOGIN_URL = '/login/'
@@ -136,15 +145,18 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
-    # Railway handles HTTPS termination at the edge proxy, so we don't redirect
-    # internally (would cause infinite loops). The proxy sends X-Forwarded-Proto.
+    # Railway handles HTTPS at the edge proxy. Don't redirect internally.
     SECURE_SSL_REDIRECT = False
 
-    # Cookies are secure because the browser sees HTTPS (Railway edge)
+    # Cookies are secure because browser sees HTTPS (Railway edge terminates SSL)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-    # HSTS: Tell browsers to always use HTTPS for this domain (1 year)
+    # HSTS: Tell browsers to always use HTTPS
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# ─── CSRF DEBUGGING (Temporary) ───
+# Uncomment this to see detailed CSRF failure info in logs
+# CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'

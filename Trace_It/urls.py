@@ -8,12 +8,13 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('index/', views.index, name='index'),
     path('dashboard/', views.dashboard, name='dashboard'),
-    path('animal/<int:animal_id>/', views.animal_detail, name='animal_detail'),
+    # FIX: animal_id is a string (e.g., "ANM-2026-0001"), not an integer
+    path('animal/<str:animal_id>/', views.animal_detail, name='animal_detail'),
     path('animal/add/', views.add_animal, name='add_animal'),
-    path('animal/<int:animal_id>/edit/', views.edit_animal, name='edit_animal'),
-    path('animal/<int:animal_id>/delete/', views.delete_animal, name='delete_animal'),
+    path('animal/<str:animal_id>/edit/', views.edit_animal, name='edit_animal'),
+    path('animal/<str:animal_id>/delete/', views.delete_animal, name='delete_animal'),
     path('animals/', views.animal_list, name='animal_list'),
-    path('animal/<int:animal_id>/history/', views.location_history, name='location_history'),
+    path('animal/<str:animal_id>/history/', views.location_history, name='location_history'),
     path('map/', views.map_view, name='map_view'),
     path('tags/', views.tag_list, name='tag_list'),
     path('tag/add/', views.add_tag, name='add_tag'),
@@ -36,4 +37,5 @@ urlpatterns = [
     path('api/iot/ingest/', views.iot_ingest, name='iot_ingest'),
     path('api/iot/register/', views.iot_register, name='iot_register'),
     path('api/iot/status/<str:tag_serial>/', views.iot_status, name='iot_status'),
+    path('api/tag/<str:tag_serial>/data/', views.get_tag_latest_data, name='get_tag_latest_data'),
 ]

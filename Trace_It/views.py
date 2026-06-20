@@ -3,6 +3,7 @@ import csv
 import json
 import logging
 import traceback
+import math
 from datetime import datetime, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -264,6 +265,59 @@ Trace_It Wildlife Monitoring System
             recipient_list=list(admin_emails),
             fail_silently=True,
         )
+
+
+# ===== GEOFENCING CONTAINMENT VALIDATION ALGORITHM =====
+
+def check_geofence_breach(animal, location):
+    """
+    Calculates the distance between the animal's new coordinates and all active geofences.
+    Triggers an Alert system record if a breach rule is violated using the Haversine formula.
+    """
+    geofences = Geofence.objects.all()
+
+    lat2 = float(location.latitude)
+    lon2 = float(location.longitude)
+
+    for fence in geofences:
+        lat1 = float(fence.center_latitude)
+        lon1 = float(fence.center_longitude)
+        radius = float(fence.radius_meters)
+
+        # Haversine Formula to compute real-world distance in meters over the Earth's surface
+        R = 6371000  # Radius of Earth in meters
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        a = (math.sin(delta_phi / 2) ** 2) + \
+            (math.cos(phi1) * math.cos(phi2) * (math.sin(delta_lambda / 2) ** 2))
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c
+
+        is_outside = distance > radius
+
+        if fence.fence_type == 'exclusion' and not is_outside:
+            Alert.objects.get_or_create(
+                animal=animal,
+                alert_type='GEOFENCE',
+                is_resolved=False,
+                defaults={
+                    'severity': 'CRITICAL',
+                    'message': f"Exclusion zone breach! {animal.nickname} has entered protected area '{fence.name}' (Distance: {distance:.1f}m)."
+                }
+            )
+        elif fence.fence_type == 'inclusion' and is_outside:
+            Alert.objects.get_or_create(
+                animal=animal,
+                alert_type='GEOFENCE',
+                is_resolved=False,
+                defaults={
+                    'severity': 'HIGH',
+                    'message': f"Inclusion zone escape! {animal.nickname} has wandered out of safe perimeter '{fence.name}' (Distance: {distance:.1f}m)."
+                }
+            )
 
 
 # ===== AUTH & LANDING =====
@@ -933,6 +987,46 @@ def export_locations_csv(request):
     return response
 
 
+# ===== API STATUS TELEMETRY LOOKUP ENGINES =====
+
+def get_tag_latest_data(request, tag_serial):
+    """
+    Retrieve structured dynamic operational metrics for maps, dashboard charts,
+    and asynchronous AJAX frontend updates.
+    """
+    try:
+        tag = TrackingTag.objects.get(tag_serial_number=tag_serial)
+    except TrackingTag.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Tag tracking record not registered'}, status=404)
+
+    deployment = Deployment.objects.filter(tag=tag, is_active=True).first()
+    animal_name = deployment.animal.nickname if deployment else None
+    animal_id = deployment.animal.animal_id if deployment else None
+
+    latest_loc = Location.objects.filter(tag=tag).order_by('-timestamp').first()
+    latest_bio = BiometricReading.objects.filter(tag=tag).order_by('-timestamp').first()
+
+    return JsonResponse({
+        'status': 'ok',
+        'tag_serial': tag.tag_serial_number,
+        'battery_level': tag.battery_level,
+        'is_assigned': tag.is_assigned,
+        'animal_id': animal_id,
+        'animal_name': animal_name,
+        'latest_location': {
+            'lat': float(latest_loc.latitude) if latest_loc else None,
+            'lon': float(latest_loc.longitude) if latest_loc else None,
+            'timestamp': latest_loc.timestamp.isoformat() if latest_loc else None,
+        },
+        'latest_biometrics': {
+            'heart_rate': latest_bio.heart_rate if latest_bio else None,
+            'spo2': latest_bio.spo2 if latest_bio else None,
+            'temperature': float(latest_bio.temperature) if latest_bio and latest_bio.temperature else None,
+            'timestamp': latest_bio.timestamp.isoformat() if latest_bio else None,
+        }
+    })
+
+
 @login_required
 @admin_required
 def export_alerts_csv(request):
@@ -940,264 +1034,86 @@ def export_alerts_csv(request):
     response['Content-Disposition'] = 'attachment; filename="alerts.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(['Animal', 'Alert Type', 'Message', 'Created At', 'Resolved', 'Resolved By', 'Resolved At'])
+    writer.writerow(['Alert ID', 'Animal', 'Type', 'Severity', 'Message', 'Timestamp', 'Status', 'Resolved By'])
 
-    alerts_qs = Alert.objects.all().select_related('animal', 'resolved_by').order_by('-timestamp')
+    alerts_list = Alert.objects.all().select_related('animal', 'resolved_by').order_by('-timestamp')[:1000]
 
-    for alert in alerts_qs:
+    for alert in alerts_list:
         writer.writerow([
-            alert.animal.nickname if alert.animal else 'N/A',
+            alert.alert_id,
+            alert.animal.nickname if alert.animal else 'Unknown',
             alert.alert_type,
+            alert.severity,
             alert.message,
             alert.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'Yes' if alert.is_resolved else 'No',
+            'Resolved' if alert.is_resolved else 'Unresolved',
             alert.resolved_by.email if alert.resolved_by else 'N/A',
-            alert.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if alert.resolved_at else 'N/A',
         ])
 
-    log_action(request.user, 'EXPORT_ALERTS_CSV', 'Exported alerts to CSV')
+    log_action(request.user, 'EXPORT_CSV', 'Exported alerts data to CSV')
     return response
 
 
 @login_required
 @admin_required
 def export_alerts(request):
-    """Export alerts as JSON for dashboard button."""
-    return JsonResponse({
-        'status': 'success',
-        'message': 'Export functionality coming soon',
-        'alerts': []
-    })
+    """JSON output mapping for external data visualizations interfaces integration"""
+    alerts_list = Alert.objects.filter(is_resolved=False).order_by('-timestamp')[:50]
+    data = []
+    for a in alerts_list:
+        data.append({
+            'id': a.alert_id,
+            'timestamp': a.timestamp.isoformat(),
+            'animal': a.animal.nickname if a.animal else 'Unknown',
+            'type': a.alert_type,
+            'severity': a.severity,
+            'message': a.message
+        })
+    return JsonResponse(data, safe=False)
 
 
 @login_required
 @admin_required
 def audit_log(request):
-    logs = AuditLog.objects.all().order_by('-timestamp')
-    user_filter = request.GET.get('user', '')
-    action_filter = request.GET.get('action', '')
-
-    if user_filter:
-        logs = logs.filter(user__email__icontains=user_filter)
-    if action_filter:
-        logs = logs.filter(action__icontains=action_filter)
-
-    context = {
-        'logs': logs[:200],
-        'user_filter': user_filter,
-        'action_filter': action_filter,
-    }
-    return render(request, 'Trace_It/audit_log.html', context)
+    """Render system-wide tracking actions and operational logs for compliance auditing."""
+    logs = AuditLog.objects.all().select_related('user').order_by('-timestamp')[:500]
+    return render(request, 'Trace_It/audit_log.html', {'logs': logs})
 
 
 @login_required
 @admin_required
 def manage_users(request):
-    if request.method == 'POST':
-        action = request.POST.get('action', '')
-
-        # ===== CREATE RANGER (from modal) =====
-        if action == 'create_ranger':
-            email = request.POST.get('email', '').strip().lower()
-            password = request.POST.get('password', '')
-            role = request.POST.get('role', 'RANGER').upper()
-            first_name = request.POST.get('first_name', '').strip()
-            last_name = request.POST.get('last_name', '').strip()
-            phone = request.POST.get('phone', '').strip()
-
-            if role not in ['RANGER', 'ADMIN']:
-                role = 'RANGER'
-
-            if not email or not password:
-                messages.error(request, 'Email and password are required.')
-                return redirect('manage_users')
-
-            if '@' not in email or '.' not in email.split('@')[-1]:
-                messages.error(request, 'Please enter a valid email address.')
-                return redirect('manage_users')
-
-            if User.objects.filter(email__iexact=email).exists():
-                messages.error(request, f'A user with email "{email}" already exists.')
-                return redirect('manage_users')
-
-            if len(password) < 6:
-                messages.error(request, 'Password must be at least 6 characters.')
-                return redirect('manage_users')
-
-            try:
-                user = User.objects.create(
-                    username=email,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    password=make_password(password),
-                )
-                UserProfile.objects.create(
-                    user=user,
-                    role='RANGER',
-                    phone=phone,
-                )
-                log_action(request.user, 'CREATE_RANGER', f'Created staff account {email}')
-                messages.success(request, f'Staff "{email}" created successfully!')
-            except Exception as e:
-                messages.error(request, f'Error creating ranger: {str(e)}')
-
-            return redirect('manage_users')
-
-        # ===== EDIT RANGER =====
-        elif action == 'edit_ranger':
-            user_id = request.POST.get('user_id')
-            if user_id:
-                try:
-                    user = User.objects.get(id=user_id)
-                    profile = user.userprofile
-
-                    email = request.POST.get('email', '').strip().lower()
-                    first_name = request.POST.get('first_name', '').strip()
-                    last_name = request.POST.get('last_name', '').strip()
-                    phone = request.POST.get('phone', '').strip()
-                    new_password = request.POST.get('password', '')
-
-                    if not email:
-                        messages.error(request, "Email is required.")
-                    elif '@' not in email or '.' not in email.split('@')[-1]:
-                        messages.error(request, "Please enter a valid email address.")
-                    elif email != user.email and User.objects.filter(email__iexact=email).exists():
-                        messages.error(request, f"A user with email '{email}' already exists.")
-                    else:
-                        old_email = user.email
-                        user.email = email
-                        user.username = email
-                        user.first_name = first_name
-                        user.last_name = last_name
-                        user.save()
-
-                        profile.phone = phone
-                        profile.save()
-
-                        if new_password and len(new_password) >= 6:
-                            user.set_password(new_password)
-                            user.save()
-                            messages.info(request, f"Password for {email} updated successfully.")
-
-                        log_action(request.user, 'UPDATE_USER', f'Updated {old_email} -> {email}')
-                        messages.success(request, f'{email} updated successfully!')
-
-                except User.DoesNotExist:
-                    messages.error(request, "User not found.")
-                except Exception as e:
-                    messages.error(request, f'Error updating user: {str(e)}')
-
-            return redirect('manage_users')
-
-        elif action == 'change_role':
-            user_id = request.POST.get('user_id')
-            if user_id:
-                try:
-                    user = User.objects.get(id=user_id)
-                    profile = user.userprofile
-                    old_role = profile.role
-                    new_role = request.POST.get('role')
-
-                    if new_role in ['ADMIN', 'RANGER']:
-                        profile.role = new_role
-                        profile.save()
-
-                        old_label = 'Admin' if old_role == 'ADMIN' else 'Staff'
-                        new_label = 'Admin' if new_role == 'ADMIN' else 'Staff'
-
-                        log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
-                        messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
-
-                except User.DoesNotExist:
-                    messages.error(request, "User not found.")
-                except Exception as e:
-                    messages.error(request, f'Error changing role: {str(e)}')
-
-            return redirect('manage_users')
-
-        elif action == 'delete_user':
-            user_id = request.POST.get('user_id')
-            if user_id:
-                try:
-                    user = User.objects.get(id=user_id)
-                    if user == request.user:
-                        messages.error(request, "You cannot delete your own account.")
-                    else:
-                        email = user.email
-                        user.delete()
-                        log_action(request.user, 'DELETE_USER', f'Deleted user {email}')
-                        messages.success(request, f'User {email} deleted successfully.')
-                except User.DoesNotExist:
-                    messages.error(request, "User not found.")
-                except Exception as e:
-                    messages.error(request, f'Error deleting user: {str(e)}')
-
-            return redirect('manage_users')
-
-    users = User.objects.all().select_related('userprofile').order_by('email')
-
-    total_users = users.count()
-    admin_count = users.filter(userprofile__role='ADMIN').count()
-    ranger_count = users.filter(userprofile__role='RANGER').count()
-    active_count = users.filter(is_active=True).count()
-
-    context = {
-        'users': users,
-        'total_users': total_users,
-        'admin_count': admin_count,
-        'ranger_count': ranger_count,
-        'active_count': active_count,
-    }
-    return render(request, 'Trace_It/manage_users.html', context)
+    """Provide administrative view for managing infrastructure profiles, staff roles, and access controls."""
+    profiles = UserProfile.objects.all().select_related('user').order_by('role')
+    return render(request, 'Trace_It/manage_users.html', {'profiles': profiles})
 
 
 @login_required
 @admin_required
 def create_ranger(request):
-    """Create a new staff account (separate view for backward compatibility)."""
+    """Handle administrative registration of standard security field team personnel accounts."""
     if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password', '')
-        first_name = request.POST.get('first_name', '').strip()
-        last_name = request.POST.get('last_name', '').strip()
         phone = request.POST.get('phone', '').strip()
 
-        if not email or not password:
-            messages.error(request, 'Email and password are required.')
+        if not username or not email or not password:
+            messages.error(request, 'Missing required parameters inside deployment form.')
             return redirect('manage_users')
 
-        if '@' not in email or '.' not in email.split('@')[-1]:
-            messages.error(request, 'Please enter a valid email address.')
-            return redirect('manage_users')
-
-        if User.objects.filter(email__iexact=email).exists():
-            messages.error(request, f'A user with email "{email}" already exists.')
-            return redirect('manage_users')
-
-        if len(password) < 6:
-            messages.error(request, 'Password must be at least 6 characters.')
+        if User.objects.filter(username=username).exists() or User.objects.filter(email=email).exists():
+            messages.error(request, 'A user account with this username identity string or email address already exists.')
             return redirect('manage_users')
 
         try:
-            user = User.objects.create(
-                username=email,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                password=make_password(password),
-            )
-            UserProfile.objects.create(
-                user=user,
-                role='RANGER',
-                phone=phone,
-            )
-            log_action(request.user, 'CREATE_RANGER', f'Created staff account {email}')
-            messages.success(request, f'Staff "{email}" created successfully!')
+            with transaction.atomic():
+                user = User.objects.create_user(username=username, email=email, password=password)
+                UserProfile.objects.create(user=user, role='RANGER', phone=phone)
+            log_action(request.user, 'CREATE_USER', f'Created ranger staff node assignment profile for target email: {email}')
+            messages.success(request, f'Ranger access identity account for {email} created successfully.')
         except Exception as e:
-            messages.error(request, f'Error creating ranger: {str(e)}')
-
-        return redirect('manage_users')
+            messages.error(request, f'Error generating authenticating user node sequence: {str(e)}')
 
     return redirect('manage_users')
 
@@ -1205,25 +1121,23 @@ def create_ranger(request):
 @login_required
 @admin_required
 def toggle_user_role(request, user_id):
-    """Toggle a user's role between ADMIN and RANGER."""
-    try:
-        user = User.objects.get(id=user_id)
-        profile = user.userprofile
-        old_role = profile.role
-        new_role = 'RANGER' if old_role == 'ADMIN' else 'ADMIN'
+    """Switch user permissions clearance level between RANGER and ADMIN roles safely."""
+    target_user = get_object_or_404(User, pk=user_id)
+    if target_user == request.user:
+        messages.error(request, 'You cannot modify your own current authorization administrative clearance level loop.')
+        return redirect('manage_users')
 
+    try:
+        profile = target_user.userprofile
+        old_role = profile.role
+        new_role = 'ADMIN' if old_role == 'RANGER' else 'RANGER'
         profile.role = new_role
         profile.save()
 
-        old_label = 'Admin' if old_role == 'ADMIN' else 'Staff'
-        new_label = 'Admin' if new_role == 'ADMIN' else 'Staff'
-
-        log_action(request.user, 'CHANGE_ROLE', f'Changed {user.email} from {old_label} to {new_label}')
-        messages.success(request, f'{user.email} changed from {old_label} to {new_label}.')
-    except User.DoesNotExist:
-        messages.error(request, "User not found.")
-    except Exception as e:
-        messages.error(request, f'Error changing role: {str(e)}')
+        log_action(request.user, 'TOGGLE_ROLE', f'Changed active execution clearance role of {target_user.email} from {old_role} to {new_role}')
+        messages.success(request, f'Privilege mapping schema schema matrix for {target_user.email} successfully updated to {new_role}.')
+    except UserProfile.DoesNotExist:
+        messages.error(request, 'Profile schema registration record could not be mapped to the database topology.')
 
     return redirect('manage_users')
 
@@ -1231,22 +1145,18 @@ def toggle_user_role(request, user_id):
 @login_required
 @admin_required
 def toggle_user_status(request, user_id):
-    """Toggle a user's active status (deactivate/activate) or delete."""
-    try:
-        user = User.objects.get(id=user_id)
-        if user == request.user:
-            messages.error(request, "You cannot delete your own account.")
-            return redirect('manage_users')
+    """Toggle a user's operational active flag status flag to terminate or enable platform access capability."""
+    target_user = get_object_or_404(User, pk=user_id)
+    if target_user == request.user:
+        messages.error(request, 'You cannot trigger a self-termination account lock on your own session context loop.')
+        return redirect('manage_users')
 
-        email = user.email
-        user.delete()
-        log_action(request.user, 'DELETE_USER', f'Deleted user {email}')
-        messages.success(request, f'User {email} deleted successfully.')
-    except User.DoesNotExist:
-        messages.error(request, "User not found.")
-    except Exception as e:
-        messages.error(request, f'Error: {str(e)}')
+    target_user.is_active = not target_user.is_active
+    target_user.save()
 
+    status_str = 'activated' if target_user.is_active else 'deactivated'
+    log_action(request.user, 'TOGGLE_STATUS', f'Toggled underlying platform profile access code availability of {target_user.email} to state: {status_str}')
+    messages.info(request, f'User credential profile identity {target_user.email} has been {status_str} inside system topology.')
     return redirect('manage_users')
 
 
