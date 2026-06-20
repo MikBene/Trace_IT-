@@ -630,8 +630,7 @@ def edit_animal(request, animal_id):
         form = AnimalForm(request.POST, instance=animal, user=request.user)
         if form.is_valid():
             try:
-                with transaction.atomic():
-                    animal = form.save()
+                animal = form.save()
                 log_action(request.user, 'UPDATE_ANIMAL', f'Updated animal {animal.nickname} (ID: {animal.animal_id})')
                 messages.success(request, f'Animal "{animal.nickname}" updated successfully.')
                 return redirect('animal_list')
@@ -640,7 +639,7 @@ def edit_animal(request, animal_id):
                 messages.error(request, f'Error saving: {str(e)}')
         else:
             logger.error(f"FORM ERRORS: {form.errors}")
-            messages.error(request, 'Please fix the errors below.')
+            messages.error(request, f'Please fix the errors below: {form.errors}')
     else:
         form = AnimalForm(instance=animal, user=request.user)
 
@@ -669,11 +668,11 @@ def delete_animal(request, animal_id):
             animal.delete()
             log_action(request.user, 'DELETE_ANIMAL', f'Deleted {nickname} (ID: {animal_id})')
             messages.success(request, f'Animal "{nickname}" deleted successfully.')
+            return redirect('animal_list')
         except Exception as e:
             logger.error(f"DELETE ERROR: {e}")
             messages.error(request, f'Could not delete: {str(e)}')
-
-        return redirect('animal_list')
+            return redirect('animal_list')
 
     # GET request - show confirmation page
     return render(request, 'Trace_It/delete_animal.html', {'animal': animal})
@@ -744,9 +743,11 @@ def assign_tag(request, tag_id):
         if animal_id:
             animal = get_object_or_404(Animal, animal_id=animal_id)
 
+            # Deactivate any existing active deployments for this tag and animal
             Deployment.objects.filter(tag=tag, is_active=True).update(is_active=False, end_date=timezone.now())
             Deployment.objects.filter(animal=animal, is_active=True).update(is_active=False, end_date=timezone.now())
 
+            # Create new active deployment
             Deployment.objects.create(
                 tag=tag,
                 animal=animal,
@@ -757,7 +758,7 @@ def assign_tag(request, tag_id):
             tag.save()
 
             log_action(request.user, 'ASSIGN_TAG', f'Assigned tag {tag.tag_serial_number} to {animal.nickname}')
-            messages.success(request, f'Tag assigned to {animal.nickname}.')
+            messages.success(request, f'Tag assigned to {animal.nickname}. Animal is now ACTIVE and tracking.')
             return redirect('tag_list')
 
     assigned_animal_ids = Deployment.objects.filter(is_active=True).values_list('animal_id', flat=True)
@@ -787,7 +788,7 @@ def add_geofence(request):
                 geofence = form.save()
                 log_action(request.user, 'CREATE_GEOFENCE', f'Created geofence {geofence.name}')
                 messages.success(request, f'Geofence "{geofence.name}" created successfully.')
-                return redirect('geofence_list')
+                return redirect('map_view')
             except Exception as e:
                 messages.error(request, f'Error saving geofence: {str(e)}')
         else:
@@ -810,7 +811,7 @@ def edit_geofence(request, geofence_id):
                 form.save()
                 log_action(request.user, 'UPDATE_GEOFENCE', f'Updated geofence {geofence.name}')
                 messages.success(request, f'Geofence "{geofence.name}" updated successfully.')
-                return redirect('geofence_list')
+                return redirect('map_view')
             except Exception as e:
                 messages.error(request, f'Error updating geofence: {str(e)}')
         else:
@@ -829,8 +830,8 @@ def delete_geofence(request, geofence_id):
     if request.method == 'POST':
         log_action(request.user, 'DELETE_GEOFENCE', f'Deleted geofence {geofence.name}')
         geofence.delete()
-        messages.success(request, 'Geofence deleted.')
-        return redirect('geofence_list')
+        messages.success(request, 'Geofence deleted. Map and dashboard counts updated automatically.')
+        return redirect('map_view')
 
     return render(request, 'Trace_It/delete_geofence.html', {'geofence': geofence})
 
@@ -900,7 +901,7 @@ def location_history(request, animal_id):
 @login_required
 @ranger_required
 def map_view(request):
-    """Show ALL animals on the map with proper counts."""
+    """Show ALL animals on the map with proper counts — dynamic center based on actual GPS data."""
     try:
         animals = Animal.objects.all().select_related('species')
         locations_data = []
@@ -921,17 +922,7 @@ def map_view(request):
                         'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
                         'stationary': animal.is_stationary_minutes(90),
                     })
-                else:
-                    locations_data.append({
-                        'id': animal.animal_id,
-                        'nickname': animal.nickname,
-                        'species': animal.species.common_name if animal.species else 'Unknown',
-                        'latitude': None,
-                        'longitude': None,
-                        'speed': 0,
-                        'timestamp': 'No data yet',
-                        'stationary': False,
-                    })
+                # Animals without GPS are NOT added to locations_data — they won't appear on map until ESP32 sends data
             except Exception as e:
                 logger.error(f"map_view error for animal {animal.animal_id}: {e}")
                 continue
@@ -1169,18 +1160,16 @@ def setup_demo_geofences(request):
     try:
         animals = Animal.objects.all()
         created_count = 0
-        default_lat = -0.4167
-        default_lon = 36.9500
 
         for animal in animals:
             try:
                 loc = animal.get_latest_location()
-                if loc:
+                if loc and loc.latitude and loc.longitude:
                     lat = float(loc.latitude)
                     lon = float(loc.longitude)
                 else:
-                    lat = default_lat + (animal.id * 0.0001)
-                    lon = default_lon + (animal.id * 0.0001)
+                    # Skip animals without GPS — no demo geofence for them
+                    continue
 
                 fence_name = f"Demo Fence - {animal.nickname} (10m)"
 
@@ -1203,7 +1192,7 @@ def setup_demo_geofences(request):
         if created_count > 0:
             messages.success(request, f'Created {created_count} demo geofence(s) with 10-meter radius.')
         else:
-            messages.info(request, 'Demo geofences already exist for all animals.')
+            messages.info(request, 'No demo geofences created — animals need GPS data first.')
     except Exception as e:
         logger.error(f"setup_demo_geofences error: {e}")
         messages.error(request, f'Error creating demo geofences: {str(e)}')

@@ -140,6 +140,9 @@
         font-size: 12px;
         margin-top: 4px;
     }
+    .delete-form-inline {
+        display: inline;
+    }
 </style>
 {% endblock %}
 
@@ -152,7 +155,7 @@
                 <p class="mb-0 mt-2 opacity-75">Animal ID: <span class="animal-id-display">{{ animal.animal_id }}</span></p>
             </div>
             <div class="edit-form-body">
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" action="{% url 'edit_animal' animal.animal_id %}">
                     {% csrf_token %}
 
                     <div class="row">
@@ -298,12 +301,19 @@
                         <a href="{% url 'animal_list' %}" class="btn-cancel">
                             <i class="bi bi-x-lg me-2"></i>Cancel
                         </a>
-                        <a href="{% url 'delete_animal' animal.animal_id %}" class="btn-delete" 
-                           onclick="return confirm('Are you sure you want to delete {{ animal.nickname }}? This action cannot be undone.');">
-                            <i class="bi bi-trash me-2"></i>Delete
-                        </a>
                     </div>
                 </form>
+
+                <!-- Separate Delete Form -->
+                <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                    <form method="post" action="{% url 'delete_animal' animal.animal_id %}" class="delete-form-inline" 
+                          onsubmit="return confirm('Are you sure you want to delete {{ animal.nickname }}? This action cannot be undone.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-delete">
+                            <i class="bi bi-trash me-2"></i>Delete Animal
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

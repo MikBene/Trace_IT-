@@ -194,6 +194,10 @@
         margin-bottom: 15px;
         display: block;
     }
+    /* Inline form for delete button */
+    .delete-form {
+        display: inline;
+    }
 </style>
 {% endblock %}
 
@@ -296,10 +300,12 @@
                             <a href="{% url 'edit_animal' animal.animal_id %}" class="btn-action btn-edit" title="Edit Animal">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <a href="{% url 'delete_animal' animal.animal_id %}" class="btn-action btn-delete" title="Delete Animal"
-                               onclick="return confirm('Are you sure you want to delete {{ animal.nickname }}?');">
-                                <i class="bi bi-trash"></i>
-                            </a>
+                            <form method="post" action="{% url 'delete_animal' animal.animal_id %}" class="delete-form" onsubmit="return confirm('Are you sure you want to delete {{ animal.nickname }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-action btn-delete" title="Delete Animal">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
                         </div>
                     </td>
                 </tr>

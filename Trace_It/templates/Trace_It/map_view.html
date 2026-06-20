@@ -147,6 +147,20 @@
     }
     .btn-demo:hover { background: linear-gradient(135deg, #ed8936, #f6ad55); color: white; }
 
+    .btn-delete {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        border: none; color: white;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        transition: all 0.3s ease;
+    }
+    .btn-delete:hover {
+        background: linear-gradient(135deg, #ee5a5a, #ff6b6b);
+        transform: scale(1.05);
+        color: white;
+    }
+
     .page-title {
         background: linear-gradient(135deg, #667eea, #764ba2);
         -webkit-background-clip: text;
@@ -299,6 +313,27 @@
     }
     .demo-banner i { font-size: 20px; color: #ed8936; }
     .demo-banner span { color: #744210; font-size: 14px; }
+
+    .no-data-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255,255,255,0.95);
+        padding: 30px 40px;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        z-index: 1000;
+    }
+    .no-data-overlay h5 {
+        color: #2d3748;
+        margin-bottom: 8px;
+    }
+    .no-data-overlay p {
+        color: #718096;
+        font-size: 14px;
+        margin: 0;
+    }
 </style>
 {% endblock %}
 
@@ -341,7 +376,7 @@
     </div>
 </div>
 
-<!-- Stats Row - FIXED: Uses actual counts from view, NOT string length -->
+<!-- Stats Row -->
 <div class="row mb-4 fade-in-up delay-1">
     <div class="col-md-3 col-6 mb-3">
         <div class="stat-card">
@@ -372,7 +407,14 @@
 <!-- Map Container with Legend -->
 <div class="row mb-4 fade-in-up delay-2">
     <div class="col-lg-9">
-        <div id="map" class="shadow"></div>
+        <div id="map" class="shadow" style="position: relative;">
+            {% if animals_with_gps == 0 %}
+            <div class="no-data-overlay">
+                <h5><i class="fas fa-satellite-dish me-2" style="color: #667eea;"></i>No GPS Data Yet</h5>
+                <p>Waiting for ESP32 to send first location fix.<br>Map will auto-center on Uganda when data arrives.</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
     <div class="col-lg-3 mt-3 mt-lg-0">
         <div class="map-legend">
@@ -438,6 +480,9 @@
                                 <th><i class="fas fa-map-marker-alt me-2"></i>Center</th>
                                 <th><i class="fas fa-ruler me-2"></i>Radius</th>
                                 <th><i class="fas fa-signal me-2"></i>Status</th>
+                                {% if user.userprofile.is_admin %}
+                                <th><i class="fas fa-cog me-2"></i>Action</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -452,6 +497,16 @@
                                 <td><code style="background: rgba(102,126,234,0.1); padding: 4px 8px; border-radius: 6px; color: #667eea; font-size: 12px;">{{ fence.center_latitude }}, {{ fence.center_longitude }}</code></td>
                                 <td><span class="badge" style="background: rgba(102,126,234,0.15); color: #667eea; font-weight: 600;">{{ fence.radius_meters }} m</span></td>
                                 <td><span class="badge" style="background: linear-gradient(135deg, #42e695, #3bb2b8); color: white; font-size: 11px; padding: 5px 10px;"><i class="fas fa-check me-1"></i>Active</span></td>
+                                {% if user.userprofile.is_admin %}
+                                <td>
+                                    <form method="post" action="{% url 'delete_geofence' fence.geofence_id %}" class="d-inline" onsubmit="return confirm('Delete geofence '{{ fence.name }}'? This will update the map and dashboard counts immediately.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-delete">
+                                            <i class="fas fa-trash-alt me-1"></i>Delete
+                                        </button>
+                                    </form>
+                                </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -476,8 +531,14 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // ─── Initialize Map ───
-    var map = L.map('map', { zoomControl: false }).setView([-0.4167, 36.9500], 13);
+    // ─── Dynamic Map Center — No Hardcoded Kenya ───
+    var locations = {{ locations_data|safe }};
+    var firstLocation = locations.find(loc => loc.latitude && loc.longitude);
+    // Default to Uganda center if no GPS data yet; auto-centers on first ESP32 fix
+    var mapCenter = firstLocation ? [firstLocation.latitude, firstLocation.longitude] : [1.3733, 32.2903];
+    var mapZoom = firstLocation ? 13 : 6;
+
+    var map = L.map('map', { zoomControl: false }).setView(mapCenter, mapZoom);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // ─── Tile Layers ───
@@ -524,7 +585,6 @@
     var pathsLayer = L.layerGroup().addTo(map);
     var fencesLayer = L.layerGroup().addTo(map);
 
-    var locations = {{ locations_data|safe }};
     var pathCoordinates = [];
     var withLocationCount = 0;
 
@@ -545,7 +605,7 @@
         iconSize: [24, 24], iconAnchor: [12, 12]
     });
 
-    // ─── Render Markers ───
+    // ─── Render Markers — Only show animals with actual GPS data ───
     function renderMarkers() {
         markersLayer.clearLayers();
         pathsLayer.clearLayers();
@@ -575,20 +635,8 @@
                 marker.setOpacity(0);
                 setTimeout(function() { marker.setOpacity(1); }, index * 100);
                 pathCoordinates.push([loc.latitude, loc.longitude]);
-            } else {
-                var marker = L.marker([-0.4167, 36.9500], {
-                    icon: noLocationIcon, zIndexOffset: 500
-                }).addTo(markersLayer);
-
-                var popupContent = '<div class="popup-header" style="background: linear-gradient(135deg, #9ca3af, #6b7280);"><i class="fas fa-paw me-2"></i>' + (loc.nickname || 'Unknown') + '</div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-dna me-1"></i>Species</span><span class="popup-stat-value">' + (loc.species || 'Unknown') + '</span></div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-satellite-dish me-1"></i>Status</span><span class="popup-stat-value" style="color: #9ca3af;">Tagged, waiting for GPS</span></div>';
-                popupContent += '<div class="mt-2" style="font-size: 12px; color: #718096;"><i class="fas fa-info-circle me-1"></i>Tag attached. Location will appear when ESP32 sends first GPS fix.</div>';
-
-                marker.bindPopup(popupContent, { maxWidth: 280, className: 'custom-popup' });
-                marker.setOpacity(0);
-                setTimeout(function() { marker.setOpacity(1); }, index * 100);
             }
+            // Animals without GPS are NOT shown on map — they appear when ESP32 sends data
         });
 
         document.getElementById('stat-with-location').textContent = withLocationCount;
