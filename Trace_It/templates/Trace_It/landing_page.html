@@ -1,259 +1,305 @@
 {% extends 'Trace_It/base.html' %}
+{% load static %}
 
-{% block title %}TRACE IT - Wildlife Tracking System{% endblock %}
+{% block title %}Welcome - TRACE IT{% endblock %}
 
 {% block extra_css %}
 <style>
-    .landing-hero {
-        min-height: calc(100vh - 80px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        overflow: hidden;
-        background: linear-gradient(135deg, #0a0e27 0%, #1a3a2f 50%, #0d3328 100%);
+    /* Full-screen background image layer */
+    .landing-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url("{% static 'Trace_It/images/giraffe.jpg' %}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        opacity: 0.06;  /* Very transparent — adjust 0.03 to 0.10 as needed */
+        z-index: -2;
+        pointer-events: none;  /* Clicks pass through to content */
     }
-    .landing-hero::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background-image: 
-            linear-gradient(rgba(25, 135, 84, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(25, 135, 84, 0.05) 1px, transparent 1px);
-        background-size: 60px 60px;
-        z-index: 1;
+
+    /* Dark overlay to preserve your theme colors and text readability */
+    .landing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(10, 14, 39, 0.92);  /* Your dark theme with slight transparency */
+        z-index: -1;
     }
+
+    /* Landing page content wrapper */
     .landing-content {
         position: relative;
-        z-index: 10;
-        text-align: center;
-        padding: 40px;
+        z-index: 1;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px 20px;
     }
-    .landing-logo {
-        font-size: 80px;
+
+    /* Paw prints animation */
+    .paw-prints {
+        font-size: 40px;
         margin-bottom: 20px;
-        display: inline-block;
-        animation: logoFloat 3s ease-in-out infinite;
+        opacity: 0.6;
+        animation: pawFloat 3s ease-in-out infinite;
     }
-    @keyframes logoFloat {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-15px); }
+
+    @keyframes pawFloat {
+        0%, 100% { transform: translateY(0); opacity: 0.6; }
+        50% { transform: translateY(-10px); opacity: 0.9; }
     }
+
+    /* Title styling */
     .landing-title {
         font-family: 'Orbitron', sans-serif;
         font-size: 72px;
         font-weight: 900;
         letter-spacing: 12px;
         color: #198754;
-        text-shadow: 0 0 40px rgba(25, 135, 84, 0.5);
+        text-shadow: 0 0 40px rgba(25, 135, 84, 0.3);
         margin-bottom: 10px;
-        line-height: 1.1;
     }
+
+    /* Subtitle / QENP badge */
     .landing-subtitle {
-        font-family: 'Rajdhani', sans-serif;
-        font-size: 18px;
-        font-weight: 500;
-        letter-spacing: 6px;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.8);
-        margin-bottom: 40px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 30px;
     }
-    .landing-subtitle .qenp-badge {
-        display: inline-block;
-        background: linear-gradient(135deg, #198754, #0dcaf0);
+
+    .qenp-badge {
+        background: linear-gradient(135deg, #0dcaf0, #198754);
         color: white;
-        padding: 4px 14px;
+        padding: 6px 16px;
         border-radius: 6px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 12px;
         font-weight: 700;
-        font-size: 14px;
         letter-spacing: 3px;
-        margin-right: 10px;
-        vertical-align: middle;
     }
-    .status-indicator {
-        display: inline-flex;
+
+    .qenp-text {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+    }
+
+    /* System status indicator */
+    .system-status {
+        display: flex;
         align-items: center;
         gap: 10px;
-        background: rgba(25, 135, 84, 0.15);
+        background: rgba(25, 135, 84, 0.1);
         border: 1px solid rgba(25, 135, 84, 0.3);
         padding: 10px 24px;
         border-radius: 30px;
-        margin-bottom: 50px;
+        margin-bottom: 40px;
     }
+
     .status-dot {
-        width: 10px; height: 10px;
+        width: 10px;
+        height: 10px;
         background: #42e695;
         border-radius: 50%;
-        animation: pulse 2s ease-in-out infinite;
         box-shadow: 0 0 10px #42e695;
+        animation: pulse 2s infinite;
     }
+
     @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.6; transform: scale(1.3); }
+        50% { opacity: 0.6; transform: scale(1.2); }
     }
+
     .status-text {
         color: #42e695;
         font-size: 13px;
+        font-weight: 700;
         letter-spacing: 3px;
         text-transform: uppercase;
-        font-weight: 600;
     }
+
+    /* Login buttons */
     .login-buttons {
         display: flex;
         gap: 20px;
-        justify-content: center;
+        margin-bottom: 40px;
         flex-wrap: wrap;
+        justify-content: center;
     }
+
     .btn-landing {
-        padding: 18px 40px;
-        border-radius: 14px;
-        font-size: 15px;
+        padding: 18px 50px;
+        border-radius: 16px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
         font-weight: 700;
-        letter-spacing: 2px;
+        letter-spacing: 3px;
         text-transform: uppercase;
-        transition: all 0.4s;
         text-decoration: none;
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        min-width: 220px;
+        justify-content: center;
     }
-    .btn-landing-staff {
+
+    .btn-staff {
         background: linear-gradient(135deg, #198754, #146c43);
         color: white;
         border: none;
         box-shadow: 0 8px 30px rgba(25, 135, 84, 0.4);
     }
-    .btn-landing-staff:hover {
-        transform: translateY(-3px);
+
+    .btn-staff:hover {
+        transform: translateY(-4px) scale(1.05);
         box-shadow: 0 15px 40px rgba(25, 135, 84, 0.6);
         color: white;
     }
-    .btn-landing-admin {
+
+    .btn-admin {
         background: transparent;
         color: rgba(255, 255, 255, 0.8);
         border: 2px solid rgba(220, 53, 69, 0.5);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2);
     }
-    .btn-landing-admin:hover {
+
+    .btn-admin:hover {
         background: rgba(220, 53, 69, 0.15);
         border-color: #dc3545;
         color: #ff6b6b;
-        transform: translateY(-3px);
+        transform: translateY(-4px) scale(1.05);
         box-shadow: 0 10px 30px rgba(220, 53, 69, 0.3);
     }
-    .security-notice {
-        margin-top: 60px;
-        padding: 20px 30px;
+
+    /* Secure access box */
+    .secure-box {
         background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        display: inline-block;
+        border-radius: 20px;
+        padding: 30px 50px;
+        text-align: center;
+        max-width: 500px;
     }
-    .security-notice p {
+
+    .secure-title {
         color: rgba(255, 255, 255, 0.5);
         font-size: 12px;
-        letter-spacing: 2px;
+        font-weight: 700;
+        letter-spacing: 4px;
         text-transform: uppercase;
-        margin: 0;
-    }
-    .security-icons {
-        display: flex;
-        gap: 30px;
-        justify-content: center;
-        margin-top: 15px;
-    }
-    .security-icon-item {
+        margin-bottom: 10px;
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
-        color: rgba(255, 255, 255, 0.4);
-        font-size: 11px;
-        letter-spacing: 1px;
     }
-    .security-icon-item i {
-        color: #198754;
-        font-size: 14px;
+
+    .secure-text {
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 12px;
+        letter-spacing: 2px;
+        margin-bottom: 20px;
     }
-    .particles {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        overflow: hidden;
-        z-index: 2;
-        pointer-events: none;
+
+    .secure-icons {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
     }
-    .particles span {
-        position: absolute;
-        display: block;
-        width: 4px; height: 4px;
-        background: rgba(25, 135, 84, 0.3);
-        border-radius: 50%;
-        animation: particleFloat 25s linear infinite;
+
+    .secure-icon-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: rgba(25, 135, 84, 0.6);
+        font-size: 12px;
     }
-    .particles span:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
-    .particles span:nth-child(2) { left: 30%; top: 80%; animation-delay: 5s; }
-    .particles span:nth-child(3) { left: 50%; top: 40%; animation-delay: 10s; }
-    .particles span:nth-child(4) { left: 70%; top: 60%; animation-delay: 15s; }
-    .particles span:nth-child(5) { left: 90%; top: 30%; animation-delay: 20s; }
-    @keyframes particleFloat {
-        0% { transform: translateY(0) translateX(0); opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
-    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-        .landing-title { font-size: 42px; letter-spacing: 6px; }
-        .landing-subtitle { font-size: 14px; letter-spacing: 3px; }
-        .landing-subtitle .qenp-badge {
-            display: block;
-            margin: 0 auto 10px;
-            width: fit-content;
+        .landing-title {
+            font-size: 42px;
+            letter-spacing: 6px;
         }
-        .login-buttons { flex-direction: column; align-items: center; }
-        .btn-landing { width: 280px; justify-content: center; }
+        .qenp-text {
+            font-size: 11px;
+            letter-spacing: 2px;
+        }
+        .btn-landing {
+            padding: 15px 35px;
+            min-width: 180px;
+            font-size: 12px;
+        }
+        .secure-box {
+            padding: 20px 30px;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="landing-hero">
-    <div class="particles">
-        <span></span><span></span><span></span><span></span><span></span>
+<!-- Background layers -->
+<div class="landing-bg"></div>
+<div class="landing-overlay"></div>
+
+<!-- Main content -->
+<div class="landing-content">
+    <!-- Paw prints -->
+    <div class="paw-prints">🐾🐾</div>
+
+    <!-- Title -->
+    <h1 class="landing-title">TRACE IT</h1>
+
+    <!-- Subtitle -->
+    <div class="landing-subtitle">
+        <span class="qenp-badge">QENP</span>
+        <span class="qenp-text">Queen Elizabeth National Park Animal Monitoring Platform</span>
     </div>
-    <div class="landing-content">
-        <div class="landing-logo">🐾</div>
-        <h1 class="landing-title">TRACE IT</h1>
-        <p class="landing-subtitle">
-            <span class="qenp-badge">QENP</span>
-            Queen Elizabeth National Park Animal Monitoring Platform
-        </p>
-        <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span class="status-text">System Online</span>
+
+    <!-- System Status -->
+    <div class="system-status">
+        <span class="status-dot"></span>
+        <span class="status-text">System Online</span>
+    </div>
+
+    <!-- Login Buttons -->
+    <div class="login-buttons">
+        <a href="{% url 'ranger_login' %}" class="btn-landing btn-staff">
+            <i class="bi bi-shield-fill"></i> Staff Login
+        </a>
+        <a href="{% url 'admin_login' %}" class="btn-landing btn-admin">
+            <i class="bi bi-lock-fill"></i> Admin Login
+        </a>
+    </div>
+
+    <!-- Secure Access Box -->
+    <div class="secure-box">
+        <div class="secure-title">
+            <i class="bi bi-exclamation-triangle-fill" style="color: #ffc107;"></i>
+            Secure Access Only
         </div>
-        <div class="login-buttons">
-            <a href="{% url 'ranger_login' %}" class="btn-landing btn-landing-staff">
-                <i class="bi bi-shield-fill"></i> Staff Login
-            </a>
-            <a href="{% url 'admin_login' %}" class="btn-landing btn-landing-admin">
-                <i class="bi bi-lock-fill"></i> Admin Login
-            </a>
-        </div>
-        <div class="security-notice">
-            <p><i class="bi bi-exclamation-triangle-fill me-2"></i>Secure Access Only</p>
-            <p style="font-size: 11px; margin-top: 5px; opacity: 0.7;">Authorized personnel only. Unauthorized access is prohibited.</p>
-            <div class="security-icons">
-                <div class="security-icon-item">
-                    <i class="bi bi-shield-lock"></i>
-                    <span>SSL Encrypted</span>
-                </div>
-                <div class="security-icon-item">
-                    <i class="bi bi-shield-check"></i>
-                    <span>Protected</span>
-                </div>
-                <div class="security-icon-item">
-                    <i class="bi bi-patch-check"></i>
-                    <span>Verified</span>
-                </div>
+        <p class="secure-text">Authorized personnel only. Unauthorized access is prohibited.</p>
+        <div class="secure-icons">
+            <div class="secure-icon-item">
+                <i class="bi bi-shield-check"></i> SSL Encrypted
+            </div>
+            <div class="secure-icon-item">
+                <i class="bi bi-shield-lock"></i> Protected
+            </div>
+            <div class="secure-icon-item">
+                <i class="bi bi-check-circle"></i> Verified
             </div>
         </div>
     </div>
