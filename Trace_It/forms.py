@@ -111,9 +111,13 @@ class AnimalForm(forms.ModelForm):
             )
             self.instance.species = species_obj
 
-        instance = super().save(commit=commit)
+        # Save the animal first to get a primary key BEFORE creating Deployment
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
 
-        if esp32_tag:
+        # Only handle tag assignment after the animal has a PK
+        if commit and esp32_tag:
             existing = Deployment.objects.filter(animal=instance, tag=esp32_tag, is_active=True).first()
             if not existing:
                 Deployment.objects.filter(tag=esp32_tag, is_active=True).exclude(animal=instance).update(
@@ -133,7 +137,7 @@ class AnimalForm(forms.ModelForm):
                 Deployment.objects.create(animal=instance, tag=esp32_tag, is_active=True)
                 esp32_tag.is_assigned = True
                 esp32_tag.save()
-        else:
+        elif commit:
             old_deployments = Deployment.objects.filter(animal=instance, is_active=True)
             for dep in old_deployments:
                 dep.is_active = False
