@@ -274,7 +274,7 @@ def check_geofence_breach(animal, location):
     Calculates the distance between the animal's new coordinates and all active geofences.
     Triggers an Alert system record if a breach rule is violated using the Haversine formula.
     """
-    geofences = Geofence.objects.all()
+    geofences = Geofence.objects.filter(is_active=True)
 
     lat2 = float(location.latitude)
     lon2 = float(location.longitude)
@@ -1156,14 +1156,14 @@ def manage_users(request):
             return redirect('manage_users')
 
     # Ensure all existing users have a UserProfile before rendering
-    for user in User.objects.filter(userprofile__isnull=True):
-        UserProfile.objects.create(
+    for user in User.objects.all():
+        UserProfile.objects.get_or_create(
             user=user,
-            role='ADMIN' if user.is_superuser else 'RANGER',
-            phone=''
+            defaults={'role': 'ADMIN' if user.is_superuser else 'RANGER', 'phone': ''}
         )
 
-    users = User.objects.all().select_related('userprofile').order_by('userprofile__role', 'email')
+    # Use prefetch_related to avoid INNER JOIN filtering out users
+    users = User.objects.all().prefetch_related('userprofile').order_by('email')
     return render(request, 'Trace_It/manage_users.html', {'users': users})
 
 

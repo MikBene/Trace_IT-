@@ -238,12 +238,18 @@ class Alert(models.Model):
 
 
 class Geofence(models.Model):
+    FENCE_TYPES = [
+        ('inclusion', 'Inclusion'),
+        ('exclusion', 'Exclusion'),
+    ]
+
     geofence_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     center_latitude = models.DecimalField(max_digits=10, decimal_places=8)
     center_longitude = models.DecimalField(max_digits=11, decimal_places=8)
     radius_meters = models.PositiveIntegerField()
+    fence_type = models.CharField(max_length=20, choices=FENCE_TYPES, default='inclusion')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
