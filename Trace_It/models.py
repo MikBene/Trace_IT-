@@ -316,3 +316,25 @@ class WeatherData(models.Model):
 
     def __str__(self):
         return f"{self.temperature}°C, {self.description} @ {self.timestamp}"
+
+
+# ===== SIGNALS: Auto-create UserProfile for every User =====
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.get_or_create(
+            user=instance,
+            defaults={'role': 'RANGER', 'phone': ''}
+        )
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    try:
+        instance.userprofile.save()
+    except UserProfile.DoesNotExist:
+        pass

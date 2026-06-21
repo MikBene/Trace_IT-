@@ -1155,6 +1155,14 @@ def manage_users(request):
                 messages.error(request, f'Error updating user: {str(e)}')
             return redirect('manage_users')
 
+    # Ensure all existing users have a UserProfile before rendering
+    for user in User.objects.filter(userprofile__isnull=True):
+        UserProfile.objects.create(
+            user=user,
+            role='ADMIN' if user.is_superuser else 'RANGER',
+            phone=''
+        )
+
     users = User.objects.all().select_related('userprofile').order_by('userprofile__role', 'email')
     return render(request, 'Trace_It/manage_users.html', {'users': users})
 
