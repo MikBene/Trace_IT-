@@ -1,9 +1,9 @@
 {% extends 'Trace_It/base.html' %}
-{% load static %}
 
-{% block title %}Live Map - Trace_It{% endblock %}
+{% block title %}Live Map - TRACE IT{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     /* ===== MAP CONTAINER ===== */
     .map-wrapper {
@@ -13,7 +13,12 @@
         min-height: 500px;
         border-radius: 16px;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 2px solid rgba(255,255,255,0.15);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        transition: box-shadow 0.3s ease;
+    }
+    .map-wrapper:hover {
+        box-shadow: 0 16px 50px rgba(0,0,0,0.4);
     }
     #map {
         width: 100% !important;
@@ -60,9 +65,13 @@
         flex-shrink: 0;
         box-shadow: 0 0 6px rgba(0,0,0,0.3);
     }
-    .legend-dot.green { background: linear-gradient(135deg, #198754, #42e695); }
-    .legend-dot.yellow { background: linear-gradient(135deg, #ffc107, #ff9800); }
-    .legend-dot.red { background: linear-gradient(135deg, #dc3545, #ff6b6b); }
+    .legend-dot.live { background: linear-gradient(135deg, #42e695, #3bb2b8); }
+    .legend-dot.fallback { background: linear-gradient(135deg, #ffc107, #ff9800); }
+    .legend-dot.no-location { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+    .legend-dot.predicted { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .legend-dot.geofence { background: linear-gradient(135deg, #ff6b6b, #f03); }
+    .legend-dot.path { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 2px; height: 4px; width: 20px; }
+    .legend-dot.stationary { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); border-radius: 4px; height: 10px; width: 20px; }
 
     /* ===== FALLBACK NOTICE ===== */
     .fallback-notice {
@@ -92,7 +101,7 @@
     .animal-popup {
         color: #0a0e27;
         font-family: 'Segoe UI', system-ui, sans-serif;
-        min-width: 220px;
+        min-width: 240px;
     }
     .animal-popup h5 {
         margin: 0 0 10px 0;
@@ -126,6 +135,22 @@
         padding: 8px;
         border-radius: 8px;
     }
+    .popup-header {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 12px 16px;
+        font-weight: 600;
+        margin: -16px -16px 12px -16px;
+    }
+    .popup-stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .popup-stat:last-child { border-bottom: none; }
+    .popup-stat-label { color: #718096; font-size: 13px; }
+    .popup-stat-value { font-weight: 600; color: #2d3748; }
 
     /* ===== STATS CARDS ===== */
     .stat-card-map {
@@ -199,60 +224,302 @@
         100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
     }
 
-    /* ===== TABLE STYLES ===== */
-    .section-card {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        overflow: hidden;
+    /* Live marker (small dot for non-custom icons) */
+    .live-marker {
+        background: linear-gradient(135deg, #42e695, #3bb2b8);
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 15px rgba(66, 230, 149, 0.5);
+        animation: live-pulse 1.5s infinite;
     }
-    .section-header-green {
-        background: linear-gradient(135deg, rgba(25,135,84,0.3), rgba(25,135,84,0.1));
-        border-bottom: 1px solid rgba(25,135,84,0.3);
-        padding: 16px 20px;
+    @keyframes live-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.2); opacity: 0.8; }
     }
-    .section-header-green h5 {
-        margin: 0;
+
+    /* Predicted marker */
+    .predicted-marker {
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.9);
+        box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
+        animation: predicted-pulse 2s infinite;
+    }
+    @keyframes predicted-pulse {
+        0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.7); }
+        50% { transform: scale(1.3); opacity: 0.8; box-shadow: 0 0 0 15px rgba(245, 87, 108, 0); }
+        100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 87, 108, 0); }
+    }
+
+    /* No location marker */
+    .no-location-marker {
+        background: linear-gradient(135deg, #9ca3af, #6b7280);
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 10px rgba(156, 163, 175, 0.5);
+    }
+
+    /* Stationary badge */
+    .stationary-badge {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
         color: white;
-        font-weight: 600;
-        font-size: 16px;
-        letter-spacing: 0.5px;
-    }
-    .table-dark {
-        --bs-table-bg: transparent;
-        --bs-table-color: rgba(255,255,255,0.9);
-        --bs-table-border-color: rgba(255,255,255,0.08);
-        margin-bottom: 0;
-    }
-    .table-dark thead th {
-        background: rgba(255,255,255,0.05);
-        color: rgba(255,255,255,0.6);
+        padding: 3px 10px;
+        border-radius: 12px;
         font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+        animation: badge-glow 2s infinite alternate;
+    }
+    @keyframes badge-glow {
+        from { box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3); }
+        to { box-shadow: 0 2px 15px rgba(255, 107, 107, 0.6); }
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn-animated {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 12px;
+        font-weight: 500;
+        letter-spacing: 0.3px;
+    }
+    .btn-animated::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+    .btn-animated:hover::before { width: 300px; height: 300px; }
+    .btn-animated:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .btn-animated:active { transform: translateY(0); }
+
+    .btn-refresh {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border: none;
+        color: white;
+    }
+    .btn-refresh:hover { background: linear-gradient(135deg, #5a6fd6, #6a4190); color: white; }
+
+    .btn-auto-off {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        color: rgba(255,255,255,0.7);
+    }
+    .btn-auto-on {
+        background: linear-gradient(135deg, #ffc107, #ff9800);
+        border: none;
+        color: #000;
+        animation: auto-breathe 2s infinite;
+    }
+    @keyframes auto-breathe {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+        50% { box-shadow: 0 0 0 8px rgba(255, 193, 7, 0); }
+    }
+
+    .btn-geofence {
+        background: linear-gradient(135deg, #198754, #146c43);
+        border: none;
+        color: white;
+    }
+    .btn-geofence:hover { background: linear-gradient(135deg, #146c43, #198754); color: white; }
+
+    .btn-satellite {
+        background: linear-gradient(135deg, #0dcaf0, #0099cc);
+        border: none;
+        color: white;
+    }
+    .btn-satellite:hover { background: linear-gradient(135deg, #0099cc, #0dcaf0); color: white; }
+    .btn-street {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        color: rgba(255,255,255,0.8);
+    }
+    .btn-street:hover { background: rgba(255,255,255,0.15); color: white; }
+
+    .btn-demo {
+        background: linear-gradient(135deg, #f6ad55, #ed8936);
+        border: none;
+        color: white;
+    }
+    .btn-demo:hover { background: linear-gradient(135deg, #ed8936, #f6ad55); color: white; }
+
+    /* ===== PAGE TITLE ===== */
+    .page-title {
+        font-family: 'Orbitron', sans-serif;
+        color: white;
+        letter-spacing: 2px;
         font-weight: 700;
+    }
+    .page-title i { margin-right: 10px; color: #0dcaf0; }
+
+    /* ===== GLASS CARD ===== */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        padding: 20px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .glass-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+
+    /* ===== GEOFENCE TABLE ===== */
+    .geofence-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        width: 100%;
+    }
+    .geofence-table thead {
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        color: white;
+    }
+    .geofence-table th {
+        font-weight: 600;
+        letter-spacing: 0.5px;
         padding: 14px 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .table-dark tbody td {
-        padding: 14px 16px;
-        color: rgba(255,255,255,0.85);
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        font-size: 14px;
-        vertical-align: middle;
-    }
-    .table-dark tbody tr {
-        transition: background 0.2s;
-        cursor: pointer;
-    }
-    .table-dark tbody tr:hover {
-        background: rgba(255,255,255,0.06) !important;
-    }
-    .table-dark code {
-        color: #0dcaf0;
+        border: none;
         font-size: 12px;
+        text-transform: uppercase;
     }
+    .geofence-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        color: rgba(255,255,255,0.85);
+        transition: background 0.2s ease;
+        font-size: 14px;
+    }
+    .geofence-table tbody tr {
+        transition: all 0.3s ease;
+    }
+    .geofence-table tbody tr:hover {
+        background: rgba(255,255,255,0.05);
+    }
+    .geofence-table tbody tr:last-child td { border-bottom: none; }
+
+    /* ===== SECTION HEADER ===== */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .section-header h4 {
+        font-weight: 600;
+        color: white;
+        margin: 0;
+        font-size: 16px;
+    }
+    .section-header .header-line {
+        flex: 1;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(13,202,240,0.3), transparent);
+        border-radius: 1px;
+    }
+
+    /* ===== MAP TOAST ===== */
+    .map-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #198754, #0dcaf0);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(13,202,240,0.3);
+        font-weight: 500;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        z-index: 9999;
+    }
+    .map-toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    /* ===== ANIMATIONS ===== */
+    .refresh-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .fade-in-up {
+        animation: fadeInUp 0.6s ease forwards;
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: rgba(255,255,255,0.3);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+
+    /* ===== DEMO BANNER ===== */
+    .demo-banner {
+        background: linear-gradient(135deg, rgba(246, 173, 85, 0.15), rgba(237, 137, 54, 0.15));
+        border: 1px solid rgba(246, 173, 85, 0.4);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #ffc107;
+    }
+    .demo-banner i { font-size: 20px; }
+    .demo-banner span { color: rgba(255,255,255,0.8); font-size: 14px; }
+    .demo-banner strong { color: #fff; }
+
+    /* ===== LEAFLET POPUP OVERRIDE ===== */
+    .leaflet-popup-content-wrapper {
+        border-radius: 12px !important;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15) !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+    .leaflet-popup-content {
+        margin: 0 !important;
+        padding: 16px !important;
+        font-family: inherit !important;
+    }
+    .leaflet-popup-tip {
+        background: white !important;
+    }
+
+    /* ===== CUSTOM SCROLLBAR ===== */
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #0dcaf0, #198754); border-radius: 3px; }
 
     /* ===== RESPONSIVE ===== */
     @media (max-width: 768px) {
@@ -266,309 +533,563 @@
             top: 10px;
             right: 10px;
         }
-        .stat-card-map .number {
-            font-size: 24px;
-        }
+        .stat-card-map .number { font-size: 24px; }
     }
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4 px-4">
+<!-- Toast Notification -->
+<div id="map-toast" class="map-toast">
+    <i class="bi bi-check-circle-fill me-2"></i><span id="toast-message">Map refreshed!</span>
+</div>
 
-    <!-- Header -->
-    <div class="row mb-4 align-items-center">
-        <div class="col-md-8">
-            <h2 style="font-family: 'Orbitron', sans-serif; letter-spacing: 2px; margin-bottom: 4px;">
-                <i class="bi bi-map me-2"></i>Live Tracking Map
-            </h2>
-            <p class="text-muted mb-0">Real-time animal locations and geofence monitoring</p>
-        </div>
-        <div class="col-md-4 text-md-end mt-3 mt-md-0">
-            <a href="{% url 'setup_demo_geofences' %}" class="btn btn-outline-info btn-sm">
-                <i class="bi bi-magic me-1"></i> Setup Demo Geofences
+<!-- Demo Mode Banner -->
+{% if demo_geofences %}
+<div class="demo-banner fade-in-up">
+    <i class="bi bi-flask-fill"></i>
+    <span><strong>Demo Mode Active:</strong> 10-meter geofences auto-created for presentation testing. Walk 10+ meters away to trigger alerts.</span>
+</div>
+{% endif %}
+
+<!-- Fallback Notice -->
+<div id="fallback-banner" class="fallback-notice" style="display: none;">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+        <strong>Indoor / Campus Mode Active</strong>
+        Some animals show approximate IUIU Kibuli Campus location when GPS signal is unavailable indoors.
+    </div>
+</div>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 fade-in-up flex-wrap gap-2">
+    <h2 class="page-title"><i class="bi bi-satellite-fill"></i>Live Map</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        {% if user.userprofile.is_admin %}
+            <a href="{% url 'add_geofence' %}" class="btn btn-geofence btn-animated">
+                <i class="bi bi-hexagon me-2"></i>Add Geofence
             </a>
+            <a href="{% url 'setup_demo_geofences' %}" class="btn btn-demo btn-animated"
+               onclick="return confirm('This will create 10-meter demo geofences around all animals for presentation testing. Continue?')">
+                <i class="bi bi-magic me-2"></i>Setup Demo (10m)
+            </a>
+        {% endif %}
+        <button class="btn btn-satellite btn-animated" onclick="toggleSatellite()" id="satellite-btn">
+            <i class="bi bi-globe me-2"></i>Satellite
+        </button>
+        <button class="btn btn-refresh btn-animated" onclick="refreshMap()" id="refresh-btn">
+            <i class="bi bi-arrow-clockwise me-2" id="refresh-icon"></i>Refresh
+        </button>
+        <button class="btn btn-auto-off btn-animated" onclick="toggleAutoRefresh()" id="auto-refresh-btn">
+            <i class="bi bi-lightning me-2"></i>Auto: OFF
+        </button>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4 fade-in-up delay-1">
+    <div class="col-md-3 col-6">
+        <div class="stat-card-map">
+            <div class="number" id="stat-animals">{{ total_animals|default:0 }}</div>
+            <div class="label">Tracked Animals</div>
         </div>
     </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card-map">
+            <div class="number" id="stat-geofences">{{ geofences|length }}</div>
+            <div class="label">Geofences</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card-map">
+            <div class="number" style="color: #42e695;" id="stat-with-location">{{ animals_with_gps|default:0 }}</div>
+            <div class="label">With GPS Data</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card-map">
+            <div class="number" style="color: #ffc107;" id="stat-updated">Just now</div>
+            <div class="label">Last Updated</div>
+        </div>
+    </div>
+</div>
 
-    <!-- Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-            <div class="stat-card-map">
-                <div class="number">{{ total_animals|default:0 }}</div>
-                <div class="label">Total Animals</div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card-map">
-                <div class="number" style="color: #42e695;">{{ animals_with_gps|default:0 }}</div>
-                <div class="label">On Map</div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card-map">
-                <div class="number" style="color: #ffc107;">{{ geofences|length }}</div>
-                <div class="label">Geofences</div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card-map">
-                <div class="number" style="color: #ff6b6b;">
-                    {% with locs=locations_data|default:"[]" %}
-                        {% if locs != "[]" %}
-                            {% with loc_list=locs|safe %}
-                                {% if loc_list|length > 2 %}{{ loc_list|length }}{% else %}0{% endif %}
-                            {% endwith %}
-                        {% else %}0{% endif %}
-                    {% endwith %}
+<!-- Map Container with Legend -->
+<div class="row g-3 mb-4 fade-in-up delay-2">
+    <div class="col-lg-9">
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-overlay">
+                <h6><i class="bi bi-key me-1"></i>Map Key</h6>
+                <div class="map-legend-item">
+                    <div class="legend-dot live"></div>
+                    <span><strong>Live Location</strong> — Has GPS data</span>
                 </div>
-                <div class="label">Locations</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Fallback Notice -->
-    <div id="fallback-banner" class="fallback-notice" style="display: none;">
-        <i class="bi bi-info-circle-fill"></i>
-        <div>
-            <strong>Indoor / Campus Mode Active</strong>
-            Some animals show approximate IUIU Kibuli Campus location when GPS signal is unavailable indoors.
-        </div>
-    </div>
-
-    <!-- Map -->
-    <div class="map-wrapper">
-        <div id="map"></div>
-        <div class="map-overlay">
-            <h6><i class="bi bi-geo-alt me-1"></i> Legend</h6>
-            <div class="map-legend-item">
-                <div class="legend-dot green"></div>
-                <span>GPS Location (Real)</span>
-            </div>
-            <div class="map-legend-item">
-                <div class="legend-dot yellow"></div>
-                <span>Campus Fallback</span>
-            </div>
-            <div class="map-legend-item">
-                <div class="legend-dot red"></div>
-                <span>Stationary Alert</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Animal List Below Map -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="section-card">
-                <div class="section-header-green">
-                    <h5><i class="bi bi-list me-2"></i> Animals on Map</h5>
+                <div class="map-legend-item">
+                    <div class="legend-dot fallback"></div>
+                    <span><strong>Campus Fallback</strong> — Indoor mode</span>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover mb-0">
+                <div class="map-legend-item">
+                    <div class="legend-dot no-location"></div>
+                    <span><strong>Tagged, No GPS</strong> — Waiting for data</span>
+                </div>
+                <div class="map-legend-item">
+                    <div class="legend-dot path"></div>
+                    <span><strong>Movement Path</strong> — Travel route</span>
+                </div>
+                <div class="map-legend-item">
+                    <div class="legend-dot geofence"></div>
+                    <span><strong>Geofence</strong> — Alert boundary</span>
+                </div>
+                <div class="map-legend-item">
+                    <div class="legend-dot stationary"></div>
+                    <span><strong>Stationary</strong> — 90+ min idle</span>
+                </div>
+                <hr style="margin: 12px 0; opacity: 0.2; border-color: rgba(255,255,255,0.2);">
+                <div class="map-legend-item" style="font-size: 11px; color: rgba(255,255,255,0.4);">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Animals appear immediately after tag attachment. GPS data updates when ESP32 sends location.
+                </div>
+                {% if demo_geofences %}
+                <hr style="margin: 12px 0; opacity: 0.2; border-color: rgba(255,255,255,0.2);">
+                <div class="map-legend-item" style="font-size: 11px; color: #ffc107;">
+                    <i class="bi bi-flask me-2"></i>
+                    <strong>Demo Mode:</strong> 10m geofences active. Walk 10+ meters to trigger breach alert.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3">
+        <!-- Animal List on Side -->
+        <div class="glass-card" style="max-height: 75vh; overflow-y: auto;">
+            <h6 class="fw-bold mb-3" style="color: white; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+                <i class="bi bi-list me-2" style="color: #0dcaf0;"></i>Animals on Map
+            </h6>
+            <div id="animal-side-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Geofences Section -->
+<div class="row fade-in-up delay-3">
+    <div class="col-md-12">
+        <div class="glass-card">
+            <div class="section-header">
+                <i class="bi bi-shield-fill" style="color: #ff6b6b; font-size: 18px;"></i>
+                <h4>Active Geofences</h4>
+                <div class="header-line"></div>
+                <span class="badge" style="background: linear-gradient(135deg, #198754, #0dcaf0); font-size: 12px; padding: 6px 12px; border-radius: 8px;">
+                    {{ geofences|length }} Active
+                </span>
+            </div>
+            {% if geofences %}
+                <div class="table-responsive custom-scroll" style="max-height: 300px;">
+                    <table class="table geofence-table">
                         <thead>
                             <tr>
-                                <th>Animal</th>
-                                <th>Species</th>
-                                <th>Location Type</th>
-                                <th>Coordinates</th>
-                                <th>Last Update</th>
-                                <th>Speed</th>
-                                <th>Status</th>
+                                <th><i class="bi bi-tag me-2"></i>Name</th>
+                                <th><i class="bi bi-geo-alt me-2"></i>Center</th>
+                                <th><i class="bi bi-rulers me-2"></i>Radius</th>
+                                <th><i class="bi bi-broadcast me-2"></i>Status</th>
                             </tr>
                         </thead>
-                        <tbody id="animal-table-body">
+                        <tbody>
+                            {% for fence in geofences %}
+                            <tr>
+                                <td>
+                                    <strong style="color: rgba(255,255,255,0.9);">{{ fence.name }}</strong>
+                                    {% if 'Demo' in fence.name %}
+                                        <span class="badge" style="background: rgba(255,193,7,0.2); color: #ffc107; font-size: 10px; margin-left: 6px;">DEMO</span>
+                                    {% endif %}
+                                </td>
+                                <td><code style="background: rgba(13,202,240,0.1); padding: 4px 8px; border-radius: 6px; color: #0dcaf0; font-size: 12px;">{{ fence.center_latitude }}, {{ fence.center_longitude }}</code></td>
+                                <td><span class="badge" style="background: rgba(13,202,240,0.15); color: #0dcaf0; font-weight: 600;">{{ fence.radius_meters }} m</span></td>
+                                <td><span class="badge" style="background: linear-gradient(135deg, #42e695, #3bb2b8); color: white; font-size: 11px; padding: 5px 10px;"><i class="bi bi-check me-1"></i>Active</span></td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
-            </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-shield"></i>
+                    <p>No geofences configured yet.</p>
+                    {% if user.userprofile.is_admin %}
+                        <a href="{% url 'add_geofence' %}" class="btn btn-sm" style="background: linear-gradient(135deg, #198754, #0dcaf0); color: white; border-radius: 8px;">
+                            <i class="bi bi-plus me-1"></i>Create First Geofence
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
     </div>
-
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     (function() {
         'use strict';
 
         // Parse locations data from Django
-        const locations = JSON.parse('{{ locations_data|safe|default:"[]" }}');
-        const fallbackLoc = JSON.parse('{{ fallback_location|default:"null"|safe }}');
+        var locations = JSON.parse('{{ locations_data|safe|default:"[]" }}');
+        var fallbackLoc = JSON.parse('{{ fallback_location|default:"null"|safe }}');
 
         // Show fallback notice if any animal uses fallback
-        const hasFallback = locations.some(function(loc) { return loc.is_fallback; });
+        var hasFallback = locations.some(function(loc) { return loc.is_fallback; });
         if (hasFallback) {
             document.getElementById('fallback-banner').style.display = 'flex';
         }
 
-        // Initialize map centered on IUIU Kibuli or first animal
-        const defaultCenter = (locations.length > 0) 
+        // ─── Initialize Map ───
+        // Center on IUIU Kibuli or first animal
+        var defaultCenter = (locations.length > 0)
             ? [locations[0].latitude, locations[0].longitude]
             : (fallbackLoc ? [fallbackLoc.lat, fallbackLoc.lon] : [0.3006, 32.5916]);
-        
-        const defaultZoom = locations.length > 0 ? 16 : 15;
-        const map = L.map('map', {
-            zoomControl: true,
-            attributionControl: true
-        }).setView(defaultCenter, defaultZoom);
+        var defaultZoom = locations.length > 0 ? 16 : 15;
 
-        // Dark theme map tiles (CARTO Dark Matter)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20,
-            minZoom: 3
-        }).addTo(map);
+        var map = L.map('map', { zoomControl: false }).setView(defaultCenter, defaultZoom);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Store markers for table interaction
-        const markers = {};
+        // ─── Tile Layers ───
+        var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+            maxZoom: 20
+        });
 
-        // Function to create marker icon
-        function createIcon(markerClass, isStationary) {
-            const stationaryClass = isStationary ? 'stationary' : '';
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 20
+        });
+
+        // Start with satellite view (better for wildlife tracking)
+        satelliteLayer.addTo(map);
+        var currentLayer = 'satellite';
+        document.getElementById('satellite-btn').innerHTML = '<i class="bi bi-map me-2"></i>Street';
+        document.getElementById('satellite-btn').classList.remove('btn-satellite');
+        document.getElementById('satellite-btn').classList.add('btn-street');
+
+        function toggleSatellite() {
+            var btn = document.getElementById('satellite-btn');
+            if (currentLayer === 'satellite') {
+                map.removeLayer(satelliteLayer);
+                streetLayer.addTo(map);
+                currentLayer = 'street';
+                btn.innerHTML = '<i class="bi bi-globe me-2"></i>Satellite';
+                btn.classList.remove('btn-street');
+                btn.classList.add('btn-satellite');
+                showToast('Switched to Street View');
+            } else {
+                map.removeLayer(streetLayer);
+                satelliteLayer.addTo(map);
+                currentLayer = 'satellite';
+                btn.innerHTML = '<i class="bi bi-map me-2"></i>Street';
+                btn.classList.remove('btn-satellite');
+                btn.classList.add('btn-street');
+                showToast('Switched to Satellite View');
+            }
+        }
+
+        // ─── Layers ───
+        var markersLayer = L.layerGroup().addTo(map);
+        var pathsLayer = L.layerGroup().addTo(map);
+        var fencesLayer = L.layerGroup().addTo(map);
+
+        var pathCoordinates = [];
+        var withLocationCount = 0;
+
+        // ─── Custom Icons ───
+        function createLiveIcon() {
             return L.divIcon({
                 className: 'custom-marker',
-                html: '<div class="marker-pin ' + markerClass + ' ' + stationaryClass + '"><i class="bi bi-geo-alt-fill"></i></div>',
+                html: '<div class="marker-pin green"><i class="bi bi-geo-alt-fill"></i></div>',
                 iconSize: [40, 40],
                 iconAnchor: [20, 40],
                 popupAnchor: [0, -36]
             });
         }
 
-        // Add animal markers
-        locations.forEach(function(loc) {
-            const isFallback = loc.is_fallback;
-            const isStationary = loc.stationary;
-
-            // Determine marker style
-            let markerClass = 'green';
-            if (isStationary) markerClass = 'red';
-            else if (isFallback) markerClass = 'yellow';
-
-            // Create marker
-            const marker = L.marker([loc.latitude, loc.longitude], {
-                icon: createIcon(markerClass, isStationary)
-            }).addTo(map);
-
-            // Popup content
-            const popupContent = 
-                '<div class="animal-popup">' +
-                    '<h5><i class="bi bi-paw me-1"></i> ' + loc.nickname + '</h5>' +
-                    '<p><strong>ID:</strong> ' + loc.id + '</p>' +
-                    '<p><strong>Species:</strong> ' + loc.species + '</p>' +
-                    '<p><strong>Coordinates:</strong> ' + loc.latitude.toFixed(6) + ', ' + loc.longitude.toFixed(6) + '</p>' +
-                    '<p><strong>Speed:</strong> ' + loc.speed + ' km/h</p>' +
-                    '<p><strong>Last Update:</strong> ' + loc.timestamp + '</p>' +
-                    '<p>' +
-                        '<span class="badge bg-' + (isFallback ? 'warning text-dark' : 'success') + '">' +
-                            '<i class="bi bi-' + (isFallback ? 'info-circle' : 'check-circle') + '"></i> ' +
-                            (isFallback ? 'Campus Fallback' : 'GPS Real-time') +
-                        '</span>' +
-                        (isStationary ? '<span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle"></i> Stationary</span>' : '') +
-                    '</p>' +
-                    '<a href="/animal/' + loc.id + '/" class="btn btn-sm btn-success w-100 mt-2">' +
-                        '<i class="bi bi-eye"></i> View Details' +
-                    '</a>' +
-                '</div>';
-
-            marker.bindPopup(popupContent);
-            markers[loc.id] = marker;
-
-            // Add to table
-            const tableBody = document.getElementById('animal-table-body');
-            const row = document.createElement('tr');
-
-            row.innerHTML = 
-                '<td><strong>' + loc.nickname + '</strong><br><small class="text-muted">' + loc.id + '</small></td>' +
-                '<td>' + loc.species + '</td>' +
-                '<td>' +
-                    '<span class="badge bg-' + (isFallback ? 'warning text-dark' : 'success') + '">' +
-                        (isFallback ? '<i class="bi bi-building"></i> Campus' : '<i class="bi bi-satellite"></i> GPS') +
-                    '</span>' +
-                '</td>' +
-                '<td><code>' + loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) + '</code></td>' +
-                '<td>' + loc.timestamp + '</td>' +
-                '<td>' + loc.speed + ' km/h</td>' +
-                '<td>' +
-                    (isStationary 
-                        ? '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Alert</span>' 
-                        : '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Normal</span>'
-                    ) +
-                '</td>';
-
-            // Click row to zoom to marker
-            row.addEventListener('click', function() {
-                map.setView([loc.latitude, loc.longitude], 18);
-                markers[loc.id].openPopup();
+        function createFallbackIcon() {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="marker-pin yellow"><i class="bi bi-building"></i></div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -36]
             });
-
-            tableBody.appendChild(row);
-        });
-
-        // Add geofences
-        {% for fence in geofences %}
-        (function() {
-            const fenceType = '{{ fence.fence_type|default:"inclusion" }}';
-            const fenceColor = fenceType === 'exclusion' ? '#dc3545' : '#0dcaf0';
-            const fenceFill = fenceType === 'exclusion' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(13, 202, 240, 0.1)';
-            
-            L.circle([{{ fence.center_latitude }}, {{ fence.center_longitude }}], {
-                color: fenceColor,
-                fillColor: fenceFill,
-                fillOpacity: 0.2,
-                radius: {{ fence.radius_meters }},
-                weight: 2,
-                dashArray: '8, 6'
-            }).addTo(map).bindPopup(
-                '<div class="animal-popup">' +
-                    '<h6><i class="bi bi-hexagon me-1"></i> {{ fence.name|escapejs }}</h6>' +
-                    '<p>Type: <span class="badge bg-' + (fenceType === 'exclusion' ? 'danger' : 'info') + '">' + fenceType.charAt(0).toUpperCase() + fenceType.slice(1) + '</span></p>' +
-                    '<p>Radius: {{ fence.radius_meters }}m</p>' +
-                '</div>'
-            );
-        })();
-        {% empty %}
-        console.log('No geofences configured');
-        {% endfor %}
-
-        // If no animals, show fallback campus marker and message
-        if (locations.length === 0) {
-            const noDataRow = document.createElement('tr');
-            noDataRow.innerHTML = 
-                '<td colspan="7" class="text-center text-muted py-5">' +
-                    '<i class="bi bi-inbox display-4 d-block mb-3" style="color: rgba(255,255,255,0.2);"></i>' +
-                    '<h5 class="text-muted">No animals with location data</h5>' +
-                    '<p class="text-muted mb-0">Data will appear once your ESP32 board starts sending locations.<br>' +
-                    'Fallback location: IUIU Kibuli Campus (0.3006, 32.5916)</p>' +
-                '</td>';
-            document.getElementById('animal-table-body').appendChild(noDataRow);
-
-            // Show campus marker
-            if (fallbackLoc) {
-                L.marker([fallbackLoc.lat, fallbackLoc.lon]).addTo(map)
-                    .bindPopup(
-                        '<div class="animal-popup">' +
-                            '<h6><i class="bi bi-building me-1"></i> IUIU Kibuli Campus</h6>' +
-                            '<p>Default fallback location</p>' +
-                            '<p><code>' + fallbackLoc.lat + ', ' + fallbackLoc.lon + '</code></p>' +
-                            '<p class="text-muted">Waiting for ESP32 data...</p>' +
-                        '</div>'
-                    ).openPopup();
-            }
-        } else if (locations.length > 1) {
-            // Fit bounds to show all markers
-            const group = new L.featureGroup(Object.values(markers));
-            map.fitBounds(group.getBounds().pad(0.15));
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(function() {
-            console.log('Refreshing map data...');
-            window.location.reload();
-        }, 30000);
+        function createStationaryIcon() {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="marker-pin red stationary"><i class="bi bi-exclamation-triangle-fill"></i></div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -36]
+            });
+        }
+
+        var noLocationIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: '<div class="no-location-marker"></div>',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+
+        var predictedIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: '<div class="predicted-marker"></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        // ─── Render Markers ───
+        function renderMarkers() {
+            markersLayer.clearLayers();
+            pathsLayer.clearLayers();
+            pathCoordinates = [];
+            withLocationCount = 0;
+
+            var sideList = document.getElementById('animal-side-list');
+            sideList.innerHTML = '';
+
+            locations.forEach(function(loc, index) {
+                if (loc.latitude && loc.longitude) {
+                    withLocationCount++;
+
+                    var isFallback = loc.is_fallback;
+                    var isStationary = loc.stationary;
+
+                    // Choose icon based on state
+                    var icon;
+                    if (isStationary) {
+                        icon = createStationaryIcon();
+                    } else if (isFallback) {
+                        icon = createFallbackIcon();
+                    } else {
+                        icon = createLiveIcon();
+                    }
+
+                    var marker = L.marker([loc.latitude, loc.longitude], {
+                        icon: icon,
+                        zIndexOffset: isStationary ? 2000 : (isFallback ? 1500 : 1000)
+                    }).addTo(markersLayer);
+
+                    // Popup content
+                    var popupContent = '<div class="animal-popup">' +
+                        '<h5><i class="bi bi-paw me-1"></i>' + (loc.nickname || 'Unknown') + '</h5>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-dna me-1"></i>Species</span><span class="popup-stat-value">' + (loc.species || 'Unknown') + '</span></div>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-speedometer me-1"></i>Speed</span><span class="popup-stat-value">' + (loc.speed || 0) + ' km/h</span></div>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-clock me-1"></i>Time</span><span class="popup-stat-value">' + (loc.timestamp || 'N/A') + '</span></div>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-geo me-1"></i>Coords</span><span class="popup-stat-value">' + loc.latitude.toFixed(6) + ', ' + loc.longitude.toFixed(6) + '</span></div>';
+
+                    if (isFallback) {
+                        popupContent += '<div class="mt-2"><span class="badge bg-warning text-dark"><i class="bi bi-building me-1"></i>Campus Fallback</span></div>';
+                    }
+
+                    if (isStationary) {
+                        popupContent += '<div class="mt-2"><span class="stationary-badge"><i class="bi bi-exclamation-triangle me-1"></i>Stationary 90+ MIN</span></div>';
+                    }
+
+                    popupContent += '<div class="mt-3"><button class="btn btn-sm btn-success w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation(' + (loc.id ? "'" + loc.id + "'" : 0) + ')"><i class="bi bi-magic me-1"></i>Predict Next Location</button></div>';
+                    popupContent += '<div class="mt-2"><a href="/animal/' + loc.id + '/" class="btn btn-sm btn-success w-100"><i class="bi bi-eye me-1"></i>View Details</a></div>';
+                    popupContent += '</div>';
+
+                    marker.bindPopup(popupContent, { maxWidth: 280, className: 'custom-popup' });
+
+                    // Fade in animation
+                    marker.setOpacity(0);
+                    setTimeout(function() { marker.setOpacity(1); }, index * 100);
+
+                    pathCoordinates.push([loc.latitude, loc.longitude]);
+
+                    // Add to side list
+                    var listItem = document.createElement('div');
+                    listItem.className = 'd-flex align-items-center gap-2 mb-2 p-2 rounded';
+                    listItem.style.background = 'rgba(255,255,255,0.03)';
+                    listItem.style.cursor = 'pointer';
+                    listItem.style.transition = 'background 0.2s';
+                    listItem.innerHTML =
+                        '<div style="width: 10px; height: 10px; border-radius: 50%; background: ' + (isStationary ? '#ff6b6b' : (isFallback ? '#ffc107' : '#42e695')) + '; flex-shrink: 0;"></div>' +
+                        '<div style="flex: 1; min-width: 0;">' +
+                            '<div style="font-size: 13px; color: white; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (loc.nickname || 'Unknown') + '</div>' +
+                            '<div style="font-size: 11px; color: rgba(255,255,255,0.4);">' + (loc.timestamp || 'N/A') + '</div>' +
+                        '</div>' +
+                        '<span class="badge" style="font-size: 10px; background: ' + (isFallback ? 'rgba(255,193,7,0.2); color: #ffc107;' : 'rgba(25,135,84,0.2); color: #42e695;') + '">' + (isFallback ? 'Campus' : 'GPS') + '</span>';
+
+                    listItem.addEventListener('mouseenter', function() { this.style.background = 'rgba(255,255,255,0.08)'; });
+                    listItem.addEventListener('mouseleave', function() { this.style.background = 'rgba(255,255,255,0.03)'; });
+                    listItem.addEventListener('click', function() {
+                        map.setView([loc.latitude, loc.longitude], 18);
+                        marker.openPopup();
+                    });
+                    sideList.appendChild(listItem);
+
+                } else {
+                    // No location data yet
+                    var marker = L.marker([0.3006, 32.5916], {
+                        icon: noLocationIcon,
+                        zIndexOffset: 500
+                    }).addTo(markersLayer);
+
+                    var popupContent = '<div class="popup-header" style="background: linear-gradient(135deg, #9ca3af, #6b7280);"><i class="bi bi-paw me-2"></i>' + (loc.nickname || 'Unknown') + '</div>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-dna me-1"></i>Species</span><span class="popup-stat-value">' + (loc.species || 'Unknown') + '</span></div>' +
+                        '<div class="popup-stat"><span class="popup-stat-label"><i class="bi bi-satellite me-1"></i>Status</span><span class="popup-stat-value" style="color: #9ca3af;">Tagged, waiting for GPS</span></div>' +
+                        '<div class="mt-2" style="font-size: 12px; color: #718096;"><i class="bi bi-info-circle me-1"></i>Tag attached. Location will appear when ESP32 sends first GPS fix.</div>';
+
+                    marker.bindPopup(popupContent, { maxWidth: 280, className: 'custom-popup' });
+                    marker.setOpacity(0);
+                    setTimeout(function() { marker.setOpacity(1); }, index * 100);
+                }
+            });
+
+            document.getElementById('stat-with-location').textContent = withLocationCount;
+
+            // Draw movement path
+            if (pathCoordinates.length > 1) {
+                L.polyline(pathCoordinates, {
+                    color: '#0dcaf0',
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '12, 8',
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(pathsLayer);
+            }
+
+            // Fit bounds
+            if (pathCoordinates.length > 0) {
+                map.fitBounds(pathCoordinates, { padding: [50, 50], maxZoom: 16 });
+            }
+        }
+
+        renderMarkers();
+
+        // ─── Render Geofences ───
+        function renderGeofences() {
+            fencesLayer.clearLayers();
+            {% for fence in geofences %}
+            (function() {
+                var isDemo = '{{ fence.name|escapejs }}'.indexOf('Demo') !== -1;
+                var fenceColor = isDemo ? '#ed8936' : '#ff6b6b';
+                var fenceFill = isDemo ? 'rgba(237, 137, 54, 0.15)' : 'rgba(255, 107, 107, 0.15)';
+
+                var circle = L.circle([{{ fence.center_latitude }}, {{ fence.center_longitude }}], {
+                    color: fenceColor,
+                    fillColor: fenceFill,
+                    fillOpacity: 0.3,
+                    radius: {{ fence.radius_meters }},
+                    weight: 2,
+                    dashArray: '8, 4'
+                }).addTo(fencesLayer);
+
+                var popupHtml = '<div style="font-weight:600;color:' + fenceColor + ';">' +
+                    '<i class="bi bi-shield-fill me-1"></i>{{ fence.name|escapejs }}</div>' +
+                    '<div style="font-size:12px;color:#718096;margin-top:4px;">Radius: {{ fence.radius_meters }}m</div>';
+                if (isDemo) {
+                    popupHtml += '<div style="font-size:11px;color:#ed8936;margin-top:4px;"><i class="bi bi-flask me-1"></i>Demo geofence for presentation</div>';
+                }
+                circle.bindPopup(popupHtml, { maxWidth: 200 });
+            })();
+            {% empty %}
+            console.log('No geofences configured');
+            {% endfor %}
+        }
+
+        renderGeofences();
+
+        // ─── Refresh Function ───
+        function refreshMap() {
+            var icon = document.getElementById('refresh-icon');
+            icon.classList.add('refresh-spin');
+            setTimeout(function() { location.reload(); }, 500);
+        }
+
+        // ─── Toast Notification ───
+        function showToast(message) {
+            var toast = document.getElementById('map-toast');
+            document.getElementById('toast-message').textContent = message;
+            toast.classList.add('show');
+            setTimeout(function() { toast.classList.remove('show'); }, 3000);
+        }
+
+        // ─── Auto Refresh ───
+        var autoRefreshInterval = null;
+
+        function toggleAutoRefresh() {
+            var btn = document.getElementById('auto-refresh-btn');
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.innerHTML = '<i class="bi bi-lightning me-2"></i>Auto: OFF';
+                btn.classList.remove('btn-auto-on');
+                btn.classList.add('btn-auto-off');
+                showToast('Auto-refresh disabled');
+            } else {
+                autoRefreshInterval = setInterval(function() { location.reload(); }, 30000);
+                btn.innerHTML = '<i class="bi bi-lightning me-2"></i>Auto: ON';
+                btn.classList.remove('btn-auto-off');
+                btn.classList.add('btn-auto-on');
+                showToast('Auto-refresh enabled (30s)');
+            }
+        }
+
+        // ─── Predict Next Location ───
+        function predictNextLocation(animalId) {
+            if (!animalId || animalId === '0') {
+                showToast('Prediction not available');
+                return;
+            }
+            showToast('Calculating prediction...');
+            fetch('/api/predict/' + animalId + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.predicted_latitude && data.predicted_longitude) {
+                        var predMarker = L.marker([data.predicted_latitude, data.predicted_longitude], {
+                            icon: predictedIcon,
+                            zIndexOffset: 2000
+                        }).addTo(markersLayer);
+                        predMarker.bindPopup(
+                            '<div style="font-weight:600;color:#f5576c;"><i class="bi bi-magic me-2"></i>Predicted Next Location</div>' +
+                            '<div style="font-size:12px;color:#718096;margin-top:4px;">Lat: ' + data.predicted_latitude.toFixed(4) + '<br>Lng: ' + data.predicted_longitude.toFixed(4) + '</div>',
+                            { maxWidth: 220 }
+                        );
+                        predMarker.openPopup();
+                        map.panTo([data.predicted_latitude, data.predicted_longitude]);
+                        showToast('Prediction displayed on map');
+                    } else {
+                        showToast('No prediction data available');
+                    }
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    showToast('Prediction failed');
+                });
+        }
+
+        // ─── Update Time Display ───
+        function updateTimeDisplay() {
+            var now = new Date();
+            document.getElementById('stat-updated').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        updateTimeDisplay();
+
+        // If no animals, show fallback campus marker
+        if (locations.length === 0 && fallbackLoc) {
+            L.marker([fallbackLoc.lat, fallbackLoc.lon]).addTo(map)
+                .bindPopup(
+                    '<div class="animal-popup">' +
+                        '<h5 style="color: #ffc107;"><i class="bi bi-building me-1"></i>IUIU Kibuli Campus</h5>' +
+                        '<p>Default fallback location</p>' +
+                        '<p><code>' + fallbackLoc.lat + ', ' + fallbackLoc.lon + '</code></p>' +
+                        '<p class="text-muted">Waiting for ESP32 data...</p>' +
+                    '</div>'
+                ).openPopup();
+        }
 
     })();
 </script>
