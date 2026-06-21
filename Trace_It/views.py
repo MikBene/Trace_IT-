@@ -910,7 +910,8 @@ def map_view(request):
         for animal in animals:
             try:
                 loc = animal.get_latest_location()
-                if loc and loc.latitude and loc.longitude:
+                # Exclude sentinel values (-999) which mean no GPS fix from ESP32
+                if loc and loc.latitude and loc.longitude and float(loc.latitude) != -999 and float(loc.longitude) != -999:
                     animals_with_gps += 1
                     locations_data.append({
                         'id': animal.animal_id,
@@ -922,7 +923,8 @@ def map_view(request):
                         'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
                         'stationary': animal.is_stationary_minutes(90),
                     })
-                # Animals without GPS are NOT added to locations_data — they won't appear on map until ESP32 sends data
+                # Animals without GPS or with sentinel values are NOT added to locations_data
+                # They won't appear on map until ESP32 sends valid GPS data
             except Exception as e:
                 logger.error(f"map_view error for animal {animal.animal_id}: {e}")
                 continue
@@ -949,7 +951,6 @@ def map_view(request):
             'total_animals': 0,
             'animals_with_gps': 0,
         })
-
 
 @login_required
 @admin_required
