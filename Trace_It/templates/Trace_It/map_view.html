@@ -1,747 +1,575 @@
 {% extends 'Trace_It/base.html' %}
+{% load static %}
 
-{% block title %}Map View - TRACE IT{% endblock %}
+{% block title %}Live Map - Trace_It{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 <style>
-    #map {
-        height: 600px;
+    /* ===== MAP CONTAINER ===== */
+    .map-wrapper {
+        position: relative;
         width: 100%;
+        height: 75vh;
+        min-height: 500px;
         border-radius: 16px;
-        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-        border: 2px solid rgba(255,255,255,0.3);
-        transition: box-shadow 0.3s ease;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.1);
     }
-    #map:hover {
-        box-shadow: 0 16px 50px rgba(0,0,0,0.2);
+    #map {
+        width: 100% !important;
+        height: 100% !important;
+        background: #0a0e27;
     }
 
-    .custom-scroll::-webkit-scrollbar { width: 6px; }
-    .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 3px; }
-
-    .predicted-marker {
-        background: linear-gradient(135deg, #f093fb, #f5576c);
-        width: 20px; height: 20px;
+    /* ===== MAP OVERLAY (Legend) ===== */
+    .map-overlay {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        z-index: 1000;
+        background: rgba(10, 14, 39, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 12px;
+        padding: 15px;
+        min-width: 220px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .map-overlay h6 {
+        color: white;
+        margin-bottom: 14px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 700;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 8px;
+    }
+    .map-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: rgba(255,255,255,0.85);
+    }
+    .legend-dot {
+        width: 14px;
+        height: 14px;
         border-radius: 50%;
-        border: 3px solid rgba(255,255,255,0.9);
-        box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
+        flex-shrink: 0;
+        box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+    .legend-dot.green { background: linear-gradient(135deg, #198754, #42e695); }
+    .legend-dot.yellow { background: linear-gradient(135deg, #ffc107, #ff9800); }
+    .legend-dot.red { background: linear-gradient(135deg, #dc3545, #ff6b6b); }
+
+    /* ===== FALLBACK NOTICE ===== */
+    .fallback-notice {
+        background: rgba(255,193,7,0.12);
+        border: 1px solid rgba(255,193,7,0.35);
+        color: #ffc107;
+        padding: 14px 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .fallback-notice i {
+        font-size: 22px;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+    .fallback-notice strong {
+        color: #fff;
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    /* ===== POPUP STYLES ===== */
+    .animal-popup {
+        color: #0a0e27;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        min-width: 220px;
+    }
+    .animal-popup h5 {
+        margin: 0 0 10px 0;
+        color: #198754;
+        font-weight: 800;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .animal-popup p {
+        margin: 5px 0;
+        font-size: 13px;
+        color: #333;
+    }
+    .animal-popup p strong {
+        color: #0a0e27;
+        font-weight: 600;
+    }
+    .animal-popup .badge {
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+    .animal-popup .btn-success {
+        background: linear-gradient(135deg, #198754, #146c43);
+        border: none;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    /* ===== STATS CARDS ===== */
+    .stat-card-map {
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 14px;
+        padding: 18px 12px;
+        text-align: center;
+        transition: transform 0.3s;
+    }
+    .stat-card-map:hover {
+        transform: translateY(-3px);
+    }
+    .stat-card-map .number {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 32px;
+        font-weight: 900;
+        color: #0dcaf0;
+        line-height: 1;
+    }
+    .stat-card-map .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: rgba(255,255,255,0.5);
+        margin-top: 8px;
+        font-weight: 600;
+    }
+
+    /* ===== CUSTOM MARKERS ===== */
+    .custom-marker {
+        background: transparent !important;
+        border: none !important;
+    }
+    .marker-pin {
+        width: 40px;
+        height: 40px;
+        border-radius: 50% 50% 50% 0;
+        position: absolute;
+        transform: rotate(-45deg);
+        left: 50%;
+        top: 50%;
+        margin: -20px 0 0 -20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        border: 2px solid rgba(255,255,255,0.2);
+    }
+    .marker-pin i {
+        transform: rotate(45deg);
+        font-size: 18px;
+        color: white;
+    }
+    .marker-pin.green {
+        background: linear-gradient(135deg, #198754, #146c43);
+    }
+    .marker-pin.yellow {
+        background: linear-gradient(135deg, #ffc107, #e6a700);
+    }
+    .marker-pin.red {
+        background: linear-gradient(135deg, #dc3545, #a71d2a);
+    }
+    .marker-pin.stationary {
         animation: pulse-ring 2s infinite;
     }
     @keyframes pulse-ring {
-        0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.7); }
-        50% { transform: scale(1.3); opacity: 0.8; box-shadow: 0 0 0 15px rgba(245, 87, 108, 0); }
-        100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 87, 108, 0); }
+        0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); }
+        70% { box-shadow: 0 0 0 12px rgba(220, 53, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
     }
 
-    .live-marker {
-        background: linear-gradient(135deg, #42e695, #3bb2b8);
-        width: 16px; height: 16px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 0 15px rgba(66, 230, 149, 0.5);
-        animation: live-pulse 1.5s infinite;
-    }
-    @keyframes live-pulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.2); opacity: 0.8; }
-    }
-
-    .no-location-marker {
-        background: linear-gradient(135deg, #9ca3af, #6b7280);
-        width: 14px; height: 14px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 0 10px rgba(156, 163, 175, 0.5);
-    }
-
-    .stationary-badge {
-        background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
-        color: white;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 11px; font-weight: 600;
-        letter-spacing: 0.5px; text-transform: uppercase;
-        box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-        animation: badge-glow 2s infinite alternate;
-    }
-    @keyframes badge-glow {
-        from { box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3); }
-        to { box-shadow: 0 2px 15px rgba(255, 107, 107, 0.6); }
-    }
-
-    .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 16px;
-        border: 1px solid rgba(255,255,255,0.5);
-        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-        padding: 20px;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .glass-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 40px rgba(31, 38, 135, 0.15);
-    }
-
-    .btn-animated {
-        position: relative; overflow: hidden;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border-radius: 12px;
-        font-weight: 500; letter-spacing: 0.3px;
-    }
-    .btn-animated::before {
-        content: ''; position: absolute; top: 50%; left: 50%;
-        width: 0; height: 0;
-        background: rgba(255,255,255,0.2); border-radius: 50%;
-        transform: translate(-50%, -50%);
-        transition: width 0.6s, height 0.6s;
-    }
-    .btn-animated:hover::before { width: 300px; height: 300px; }
-    .btn-animated:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
-    .btn-animated:active { transform: translateY(0); }
-
-    .btn-refresh {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        border: none; color: white;
-    }
-    .btn-refresh:hover { background: linear-gradient(135deg, #5a6fd6, #6a4190); color: white; }
-
-    .btn-auto-off {
-        background: linear-gradient(135deg, #a8edea, #fed6e3);
-        border: none; color: #4a5568;
-    }
-    .btn-auto-on {
-        background: linear-gradient(135deg, #ffecd2, #fcb69f);
-        border: none; color: #744210;
-        animation: auto-breathe 2s infinite;
-    }
-    @keyframes auto-breathe {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(252, 182, 159, 0.4); }
-        50% { box-shadow: 0 0 0 8px rgba(252, 182, 159, 0); }
-    }
-
-    .btn-geofence {
-        background: linear-gradient(135deg, #d4fc79, #96e6a1);
-        border: none; color: #2d5016;
-    }
-    .btn-geofence:hover { background: linear-gradient(135deg, #c5f065, #87d792); color: #2d5016; }
-
-    .btn-satellite {
-        background: linear-gradient(135deg, #1e3a5f, #2d5a87);
-        border: none; color: white;
-    }
-    .btn-satellite:hover { background: linear-gradient(135deg, #2d5a87, #1e3a5f); color: white; }
-    .btn-street {
-        background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
-        border: none; color: #2d3748;
-    }
-    .btn-street:hover { background: linear-gradient(135deg, #cbd5e0, #e2e8f0); color: #2d3748; }
-
-    .btn-demo {
-        background: linear-gradient(135deg, #f6ad55, #ed8936);
-        border: none; color: white;
-    }
-    .btn-demo:hover { background: linear-gradient(135deg, #ed8936, #f6ad55); color: white; }
-
-    .btn-delete {
-        background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
-        border: none; color: white;
-        padding: 5px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        transition: all 0.3s ease;
-    }
-    .btn-delete:hover {
-        background: linear-gradient(135deg, #ee5a5a, #ff6b6b);
-        transform: scale(1.05);
-        color: white;
-    }
-
-    .page-title {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-weight: 700; letter-spacing: -0.5px;
-    }
-    .page-title i { -webkit-text-fill-color: #667eea; margin-right: 10px; }
-
-    .geofence-table {
-        border-collapse: separate; border-spacing: 0;
-        border-radius: 12px; overflow: hidden;
-    }
-    .geofence-table thead {
-        background: linear-gradient(135deg, #667eea, #764ba2); color: white;
-    }
-    .geofence-table th {
-        font-weight: 600; letter-spacing: 0.5px;
-        padding: 14px 16px; border: none;
-    }
-    .geofence-table td {
-        padding: 12px 16px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        transition: background 0.2s ease;
-    }
-    .geofence-table tbody tr { transition: all 0.3s ease; }
-    .geofence-table tbody tr:hover {
-        background: linear-gradient(90deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
-        transform: scale(1.01);
-    }
-    .geofence-table tbody tr:last-child td { border-bottom: none; }
-
-    .map-legend {
-        background: rgba(255,255,255,0.9);
+    /* ===== TABLE STYLES ===== */
+    .section-card {
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 15px 20px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        border: 1px solid rgba(255,255,255,0.6);
-    }
-    .legend-item {
-        display: flex; align-items: center; gap: 10px;
-        padding: 6px 0; font-size: 13px; color: #4a5568;
-        transition: transform 0.2s ease;
-    }
-    .legend-item:hover { transform: translateX(4px); }
-    .legend-dot {
-        width: 14px; height: 14px;
-        border-radius: 50%; flex-shrink: 0;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    .legend-dot.live { background: linear-gradient(135deg, #42e695, #3bb2b8); }
-    .legend-dot.no-location { background: linear-gradient(135deg, #9ca3af, #6b7280); }
-    .legend-dot.predicted { background: linear-gradient(135deg, #f093fb, #f5576c); }
-    .legend-dot.geofence { background: linear-gradient(135deg, #ff6b6b, #f03); }
-    .legend-dot.path { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 2px; height: 4px; width: 20px; }
-    .legend-dot.stationary { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); border-radius: 4px; height: 10px; width: 20px; }
-
-    .stat-card {
-        background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
-        border-radius: 12px;
-        padding: 16px 20px; text-align: center;
-        border: 1px solid rgba(102,126,234,0.15);
-        transition: all 0.3s ease;
-    }
-    .stat-card:hover {
-        background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
-        transform: translateY(-2px);
-    }
-    .stat-number {
-        font-size: 28px; font-weight: 700;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    .stat-label {
-        font-size: 12px; color: #718096;
-        text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
-    }
-
-    .section-header {
-        display: flex; align-items: center; gap: 10px;
-        margin-bottom: 16px;
-    }
-    .section-header h4 { font-weight: 600; color: #2d3748; margin: 0; }
-    .section-header .header-line {
-        flex: 1; height: 2px;
-        background: linear-gradient(90deg, rgba(102,126,234,0.3), transparent);
-        border-radius: 1px;
-    }
-
-    .map-toast {
-        position: fixed; bottom: 30px; right: 30px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white; padding: 14px 24px;
-        border-radius: 12px;
-        box-shadow: 0 8px 30px rgba(102,126,234,0.3);
-        font-weight: 500;
-        transform: translateY(100px); opacity: 0;
-        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        z-index: 9999;
-    }
-    .map-toast.show { transform: translateY(0); opacity: 1; }
-
-    .refresh-spin { animation: spin 1s linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-    .fade-in-up {
-        animation: fadeInUp 0.6s ease forwards;
-        opacity: 0; transform: translateY(20px);
-    }
-    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
-    .delay-1 { animation-delay: 0.1s; }
-    .delay-2 { animation-delay: 0.2s; }
-    .delay-3 { animation-delay: 0.3s; }
-
-    .empty-state { text-align: center; padding: 40px 20px; color: #a0aec0; }
-    .empty-state i { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-
-    .leaflet-popup-content-wrapper {
-        border-radius: 12px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-        padding: 0; overflow: hidden;
-    }
-    .leaflet-popup-content { margin: 0; padding: 16px; font-family: inherit; }
-    .leaflet-popup-tip { background: white; }
-    .popup-header {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white; padding: 12px 16px;
-        font-weight: 600; margin: -16px -16px 12px -16px;
-    }
-    .popup-stat {
-        display: flex; justify-content: space-between;
-        padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05);
-    }
-    .popup-stat:last-child { border-bottom: none; }
-    .popup-stat-label { color: #718096; font-size: 13px; }
-    .popup-stat-value { font-weight: 600; color: #2d3748; }
-
-    .demo-banner {
-        background: linear-gradient(135deg, rgba(246, 173, 85, 0.15), rgba(237, 137, 54, 0.15));
-        border: 1px solid rgba(246, 173, 85, 0.4);
-        border-radius: 12px;
-        padding: 12px 16px;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .demo-banner i { font-size: 20px; color: #ed8936; }
-    .demo-banner span { color: #744210; font-size: 14px; }
-
-    .no-data-overlay {
-        position: absolute;
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(255,255,255,0.95);
-        padding: 30px 40px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 16px;
-        text-align: center;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-        z-index: 1000;
+        overflow: hidden;
     }
-    .no-data-overlay h5 {
-        color: #2d3748;
-        margin-bottom: 8px;
+    .section-header-green {
+        background: linear-gradient(135deg, rgba(25,135,84,0.3), rgba(25,135,84,0.1));
+        border-bottom: 1px solid rgba(25,135,84,0.3);
+        padding: 16px 20px;
     }
-    .no-data-overlay p {
-        color: #718096;
-        font-size: 14px;
+    .section-header-green h5 {
         margin: 0;
+        color: white;
+        font-weight: 600;
+        font-size: 16px;
+        letter-spacing: 0.5px;
+    }
+    .table-dark {
+        --bs-table-bg: transparent;
+        --bs-table-color: rgba(255,255,255,0.9);
+        --bs-table-border-color: rgba(255,255,255,0.08);
+        margin-bottom: 0;
+    }
+    .table-dark thead th {
+        background: rgba(255,255,255,0.05);
+        color: rgba(255,255,255,0.6);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .table-dark tbody td {
+        padding: 14px 16px;
+        color: rgba(255,255,255,0.85);
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 14px;
+        vertical-align: middle;
+    }
+    .table-dark tbody tr {
+        transition: background 0.2s;
+        cursor: pointer;
+    }
+    .table-dark tbody tr:hover {
+        background: rgba(255,255,255,0.06) !important;
+    }
+    .table-dark code {
+        color: #0dcaf0;
+        font-size: 12px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .map-wrapper {
+            height: 50vh;
+            min-height: 350px;
+        }
+        .map-overlay {
+            min-width: 160px;
+            padding: 10px;
+            top: 10px;
+            right: 10px;
+        }
+        .stat-card-map .number {
+            font-size: 24px;
+        }
     }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 {% endblock %}
 
 {% block content %}
-<!-- Toast Notification -->
-<div id="map-toast" class="map-toast">
-    <i class="fas fa-check-circle me-2"></i><span id="toast-message">Map refreshed!</span>
-</div>
+<div class="container-fluid mt-4 px-4">
 
-<!-- Demo Mode Banner -->
-{% if demo_geofences %}
-<div class="demo-banner fade-in-up">
-    <i class="fas fa-flask"></i>
-    <span><strong>Demo Mode Active:</strong> 10-meter geofences auto-created for presentation testing. Walk 10+ meters away to trigger alerts.</span>
-</div>
-{% endif %}
-
-<!-- Header -->
-<div class="d-flex justify-content-between align-items-center mb-4 fade-in-up">
-    <h2 class="page-title"><i class="fas fa-satellite-dish"></i>Live Map</h2>
-    <div class="d-flex gap-2 flex-wrap">
-        {% if user.userprofile.is_admin %}
-            <a href="{% url 'add_geofence' %}" class="btn btn-geofence btn-animated">
-                <i class="fas fa-draw-polygon me-2"></i>Add Geofence
+    <!-- Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 style="font-family: 'Orbitron', sans-serif; letter-spacing: 2px; margin-bottom: 4px;">
+                <i class="bi bi-map me-2"></i>Live Tracking Map
+            </h2>
+            <p class="text-muted mb-0">Real-time animal locations and geofence monitoring</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="{% url 'setup_demo_geofences' %}" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-magic me-1"></i> Setup Demo Geofences
             </a>
-            <a href="{% url 'setup_demo_geofences' %}" class="btn btn-demo btn-animated"
-               onclick="return confirm('This will create 10-meter demo geofences around all animals for presentation testing. Continue?')">
-                <i class="fas fa-flask me-2"></i>Setup Demo (10m)
-            </a>
-        {% endif %}
-        <button class="btn btn-satellite btn-animated" onclick="toggleSatellite()" id="satellite-btn">
-            <i class="fas fa-globe me-2"></i>Satellite
-        </button>
-        <button class="btn btn-refresh btn-animated" onclick="refreshMap()" id="refresh-btn">
-            <i class="fas fa-sync-alt me-2" id="refresh-icon"></i>Refresh
-        </button>
-        <button class="btn btn-auto-off btn-animated" onclick="toggleAutoRefresh()" id="auto-refresh-btn">
-            <i class="fas fa-bolt me-2"></i>Auto: OFF
-        </button>
+        </div>
     </div>
-</div>
 
-<!-- Stats Row -->
-<div class="row mb-4 fade-in-up delay-1">
-    <div class="col-md-3 col-6 mb-3">
-        <div class="stat-card">
-            <div class="stat-number" id="stat-animals">{{ total_animals }}</div>
-            <div class="stat-label">Tracked Animals</div>
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="stat-card-map">
+                <div class="number">{{ total_animals|default:0 }}</div>
+                <div class="label">Total Animals</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card-map">
+                <div class="number" style="color: #42e695;">{{ animals_with_gps|default:0 }}</div>
+                <div class="label">On Map</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card-map">
+                <div class="number" style="color: #ffc107;">{{ geofences|length }}</div>
+                <div class="label">Geofences</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card-map">
+                <div class="number" style="color: #ff6b6b;">
+                    {% with locs=locations_data|default:"[]" %}
+                        {% if locs != "[]" %}
+                            {% with loc_list=locs|safe %}
+                                {% if loc_list|length > 2 %}{{ loc_list|length }}{% else %}0{% endif %}
+                            {% endwith %}
+                        {% else %}0{% endif %}
+                    {% endwith %}
+                </div>
+                <div class="label">Locations</div>
+            </div>
         </div>
     </div>
-    <div class="col-md-3 col-6 mb-3">
-        <div class="stat-card">
-            <div class="stat-number" id="stat-geofences">{{ geofences|length }}</div>
-            <div class="stat-label">Geofences</div>
-        </div>
-    </div>
-    <div class="col-md-3 col-6 mb-3">
-        <div class="stat-card">
-            <div class="stat-number" id="stat-with-location">{{ animals_with_gps }}</div>
-            <div class="stat-label">With GPS Data</div>
-        </div>
-    </div>
-    <div class="col-md-3 col-6 mb-3">
-        <div class="stat-card">
-            <div class="stat-number" id="stat-updated">Just now</div>
-            <div class="stat-label">Last Updated</div>
-        </div>
-    </div>
-</div>
 
-<!-- Map Container with Legend -->
-<div class="row mb-4 fade-in-up delay-2">
-    <div class="col-lg-9">
-        <div id="map" class="shadow" style="position: relative;">
-            {% if animals_with_gps == 0 %}
-            <div class="no-data-overlay">
-                <h5><i class="fas fa-satellite-dish me-2" style="color: #667eea;"></i>No GPS Data Yet</h5>
-                <p>Waiting for ESP32 to send first location fix.<br>Map will auto-center on Uganda when data arrives.</p>
-            </div>
-            {% endif %}
+    <!-- Fallback Notice -->
+    <div id="fallback-banner" class="fallback-notice" style="display: none;">
+        <i class="bi bi-info-circle-fill"></i>
+        <div>
+            <strong>Indoor / Campus Mode Active</strong>
+            Some animals show approximate IUIU Kibuli Campus location when GPS signal is unavailable indoors.
         </div>
     </div>
-    <div class="col-lg-3 mt-3 mt-lg-0">
-        <div class="map-legend">
-            <h6 class="fw-bold mb-3" style="color:#2d3748;"><i class="fas fa-key me-2" style="color:#667eea;"></i>Map Key</h6>
-            <div class="legend-item">
-                <div class="legend-dot live"></div>
-                <span><strong>Live Location</strong> — Has GPS data</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot no-location"></div>
-                <span><strong>Tagged, No GPS</strong> — Waiting for data</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot predicted"></div>
-                <span><strong>Predicted</strong> — AI forecast</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot path"></div>
-                <span><strong>Movement Path</strong> — Travel route</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot geofence"></div>
-                <span><strong>Geofence</strong> — Alert boundary</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot stationary"></div>
-                <span><strong>Stationary</strong> — 90+ min idle</span>
-            </div>
-            <hr style="margin: 12px 0; opacity: 0.2;">
-            <div class="legend-item" style="font-size: 11px; color: #a0aec0;">
-                <i class="fas fa-info-circle me-2"></i>
-                Animals appear immediately after tag attachment. GPS data updates when ESP32 sends location.
-            </div>
-            {% if demo_geofences %}
-            <hr style="margin: 12px 0; opacity: 0.2;">
-            <div class="legend-item" style="font-size: 11px; color: #ed8936;">
-                <i class="fas fa-flask me-2"></i>
-                <strong>Demo Mode:</strong> 10m geofences active. Walk 10+ meters to trigger breach alert.
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
 
-<!-- Geofences Section -->
-<div class="row fade-in-up delay-3">
-    <div class="col-md-12">
-        <div class="glass-card">
-            <div class="section-header">
-                <i class="fas fa-shield-alt" style="color: #ff6b6b; font-size: 18px;"></i>
-                <h4>Active Geofences</h4>
-                <div class="header-line"></div>
-                <span class="badge" style="background: linear-gradient(135deg, #667eea, #764ba2); font-size: 12px; padding: 6px 12px; border-radius: 8px;">
-                    {{ geofences|length }} Active
-                </span>
+    <!-- Map -->
+    <div class="map-wrapper">
+        <div id="map"></div>
+        <div class="map-overlay">
+            <h6><i class="bi bi-geo-alt me-1"></i> Legend</h6>
+            <div class="map-legend-item">
+                <div class="legend-dot green"></div>
+                <span>GPS Location (Real)</span>
             </div>
-            {% if geofences %}
-                <div class="table-responsive custom-scroll" style="max-height: 300px;">
-                    <table class="table geofence-table">
+            <div class="map-legend-item">
+                <div class="legend-dot yellow"></div>
+                <span>Campus Fallback</span>
+            </div>
+            <div class="map-legend-item">
+                <div class="legend-dot red"></div>
+                <span>Stationary Alert</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Animal List Below Map -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="section-card">
+                <div class="section-header-green">
+                    <h5><i class="bi bi-list me-2"></i> Animals on Map</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
-                                <th><i class="fas fa-tag me-2"></i>Name</th>
-                                <th><i class="fas fa-map-marker-alt me-2"></i>Center</th>
-                                <th><i class="fas fa-ruler me-2"></i>Radius</th>
-                                <th><i class="fas fa-signal me-2"></i>Status</th>
-                                {% if user.userprofile.is_admin %}
-                                <th><i class="fas fa-cog me-2"></i>Action</th>
-                                {% endif %}
+                                <th>Animal</th>
+                                <th>Species</th>
+                                <th>Location Type</th>
+                                <th>Coordinates</th>
+                                <th>Last Update</th>
+                                <th>Speed</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for fence in geofences %}
-                            <tr class="table-row-animated">
-                                <td>
-                                    <strong style="color: #2d3748;">{{ fence.name }}</strong>
-                                    {% if 'Demo' in fence.name %}
-                                        <span class="badge" style="background: rgba(246,173,85,0.2); color: #ed8936; font-size: 10px; margin-left: 6px;">DEMO</span>
-                                    {% endif %}
-                                </td>
-                                <td><code style="background: rgba(102,126,234,0.1); padding: 4px 8px; border-radius: 6px; color: #667eea; font-size: 12px;">{{ fence.center_latitude }}, {{ fence.center_longitude }}</code></td>
-                                <td><span class="badge" style="background: rgba(102,126,234,0.15); color: #667eea; font-weight: 600;">{{ fence.radius_meters }} m</span></td>
-                                <td><span class="badge" style="background: linear-gradient(135deg, #42e695, #3bb2b8); color: white; font-size: 11px; padding: 5px 10px;"><i class="fas fa-check me-1"></i>Active</span></td>
-                                {% if user.userprofile.is_admin %}
-                                <td>
-                                    <form method="post" action="{% url 'delete_geofence' fence.geofence_id %}" class="d-inline" onsubmit="return confirm('Delete geofence '{{ fence.name }}'? This will update the map and dashboard counts immediately.');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn-delete">
-                                            <i class="fas fa-trash-alt me-1"></i>Delete
-                                        </button>
-                                    </form>
-                                </td>
-                                {% endif %}
-                            </tr>
-                            {% endfor %}
+                        <tbody id="animal-table-body">
                         </tbody>
                     </table>
                 </div>
-            {% else %}
-                <div class="empty-state">
-                    <i class="fas fa-shield-alt"></i>
-                    <p>No geofences configured yet.</p>
-                    {% if user.userprofile.is_admin %}
-                        <a href="{% url 'add_geofence' %}" class="btn btn-sm" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px;">
-                            <i class="fas fa-plus me-1"></i>Create First Geofence
-                        </a>
-                    {% endif %}
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-    // ─── Dynamic Map Center — No Hardcoded Kenya ───
-    var locations = {{ locations_data|safe }};
-    var firstLocation = locations.find(loc => loc.latitude && loc.longitude);
-    // Default to Uganda center if no GPS data yet; auto-centers on first ESP32 fix
-    var mapCenter = firstLocation ? [firstLocation.latitude, firstLocation.longitude] : [1.3733, 32.2903];
-    var mapZoom = firstLocation ? 13 : 6;
+    (function() {
+        'use strict';
 
-    var map = L.map('map', { zoomControl: false }).setView(mapCenter, mapZoom);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+        // Parse locations data from Django
+        const locations = JSON.parse('{{ locations_data|safe|default:"[]" }}');
+        const fallbackLoc = JSON.parse('{{ fallback_location|default:"null"|safe }}');
 
-    // ─── Tile Layers ───
-    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-        maxZoom: 19
-    });
-
-    var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19
-    });
-
-    // Start with satellite view (better for wildlife tracking presentation)
-    satelliteLayer.addTo(map);
-    var currentLayer = 'satellite';
-    document.getElementById('satellite-btn').innerHTML = '<i class="fas fa-map me-2"></i>Street';
-    document.getElementById('satellite-btn').classList.remove('btn-satellite');
-    document.getElementById('satellite-btn').classList.add('btn-street');
-
-    function toggleSatellite() {
-        var btn = document.getElementById('satellite-btn');
-        if (currentLayer === 'satellite') {
-            map.removeLayer(satelliteLayer);
-            streetLayer.addTo(map);
-            currentLayer = 'street';
-            btn.innerHTML = '<i class="fas fa-globe me-2"></i>Satellite';
-            btn.classList.remove('btn-street');
-            btn.classList.add('btn-satellite');
-            showToast('Switched to Street View');
-        } else {
-            map.removeLayer(streetLayer);
-            satelliteLayer.addTo(map);
-            currentLayer = 'satellite';
-            btn.innerHTML = '<i class="fas fa-map me-2"></i>Street';
-            btn.classList.remove('btn-satellite');
-            btn.classList.add('btn-street');
-            showToast('Switched to Satellite View');
+        // Show fallback notice if any animal uses fallback
+        const hasFallback = locations.some(function(loc) { return loc.is_fallback; });
+        if (hasFallback) {
+            document.getElementById('fallback-banner').style.display = 'flex';
         }
-    }
 
-    var autoRefreshInterval = null;
-    var markersLayer = L.layerGroup().addTo(map);
-    var pathsLayer = L.layerGroup().addTo(map);
-    var fencesLayer = L.layerGroup().addTo(map);
+        // Initialize map centered on IUIU Kibuli or first animal
+        const defaultCenter = (locations.length > 0) 
+            ? [locations[0].latitude, locations[0].longitude]
+            : (fallbackLoc ? [fallbackLoc.lat, fallbackLoc.lon] : [0.3006, 32.5916]);
+        
+        const defaultZoom = locations.length > 0 ? 16 : 15;
+        const map = L.map('map', {
+            zoomControl: true,
+            attributionControl: true
+        }).setView(defaultCenter, defaultZoom);
 
-    var pathCoordinates = [];
-    var withLocationCount = 0;
+        // Dark theme map tiles (CARTO Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20,
+            minZoom: 3
+        }).addTo(map);
 
-    // ─── Custom Icons ───
-    var liveIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: '<div class="live-marker"></div>',
-        iconSize: [20, 20], iconAnchor: [10, 10]
-    });
-    var noLocationIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: '<div class="no-location-marker"></div>',
-        iconSize: [18, 18], iconAnchor: [9, 9]
-    });
-    var predictedIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: '<div class="predicted-marker"></div>',
-        iconSize: [24, 24], iconAnchor: [12, 12]
-    });
+        // Store markers for table interaction
+        const markers = {};
 
-    // ─── Render Markers — Only show animals with actual GPS data ───
-    function renderMarkers() {
-        markersLayer.clearLayers();
-        pathsLayer.clearLayers();
-        pathCoordinates = [];
-        withLocationCount = 0;
+        // Function to create marker icon
+        function createIcon(markerClass, isStationary) {
+            const stationaryClass = isStationary ? 'stationary' : '';
+            return L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="marker-pin ' + markerClass + ' ' + stationaryClass + '"><i class="bi bi-geo-alt-fill"></i></div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -36]
+            });
+        }
 
-        locations.forEach(function(loc, index) {
-            if (loc.latitude && loc.longitude) {
-                withLocationCount++;
-                var marker = L.marker([loc.latitude, loc.longitude], {
-                    icon: liveIcon, zIndexOffset: 1000
-                }).addTo(markersLayer);
+        // Add animal markers
+        locations.forEach(function(loc) {
+            const isFallback = loc.is_fallback;
+            const isStationary = loc.stationary;
 
-                var popupContent = '<div class="popup-header"><i class="fas fa-paw me-2"></i>' + (loc.nickname || 'Unknown') + '</div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-dna me-1"></i>Species</span><span class="popup-stat-value">' + (loc.species || 'Unknown') + '</span></div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-tachometer-alt me-1"></i>Speed</span><span class="popup-stat-value">' + (loc.speed || 0) + ' km/h</span></div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-clock me-1"></i>Time</span><span class="popup-stat-value">' + (loc.timestamp || 'N/A') + '</span></div>';
-                popupContent += '<div class="popup-stat"><span class="popup-stat-label"><i class="fas fa-map-pin me-1"></i>Coords</span><span class="popup-stat-value">' + loc.latitude.toFixed(6) + ', ' + loc.longitude.toFixed(6) + '</span></div>';
+            // Determine marker style
+            let markerClass = 'green';
+            if (isStationary) markerClass = 'red';
+            else if (isFallback) markerClass = 'yellow';
 
-                if (loc.stationary) {
-                    popupContent += '<div class="mt-2"><span class="stationary-badge"><i class="fas fa-exclamation-triangle me-1"></i>Stationary 90+ MIN</span></div>';
-                }
+            // Create marker
+            const marker = L.marker([loc.latitude, loc.longitude], {
+                icon: createIcon(markerClass, isStationary)
+            }).addTo(map);
 
-                popupContent += '<div class="mt-3"><button class="btn btn-sm w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation(' + (loc.id || 0) + ')"><i class="fas fa-magic me-1"></i>Predict Next Location</button></div>';
+            // Popup content
+            const popupContent = 
+                '<div class="animal-popup">' +
+                    '<h5><i class="bi bi-paw me-1"></i> ' + loc.nickname + '</h5>' +
+                    '<p><strong>ID:</strong> ' + loc.id + '</p>' +
+                    '<p><strong>Species:</strong> ' + loc.species + '</p>' +
+                    '<p><strong>Coordinates:</strong> ' + loc.latitude.toFixed(6) + ', ' + loc.longitude.toFixed(6) + '</p>' +
+                    '<p><strong>Speed:</strong> ' + loc.speed + ' km/h</p>' +
+                    '<p><strong>Last Update:</strong> ' + loc.timestamp + '</p>' +
+                    '<p>' +
+                        '<span class="badge bg-' + (isFallback ? 'warning text-dark' : 'success') + '">' +
+                            '<i class="bi bi-' + (isFallback ? 'info-circle' : 'check-circle') + '"></i> ' +
+                            (isFallback ? 'Campus Fallback' : 'GPS Real-time') +
+                        '</span>' +
+                        (isStationary ? '<span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle"></i> Stationary</span>' : '') +
+                    '</p>' +
+                    '<a href="/animal/' + loc.id + '/" class="btn btn-sm btn-success w-100 mt-2">' +
+                        '<i class="bi bi-eye"></i> View Details' +
+                    '</a>' +
+                '</div>';
 
-                marker.bindPopup(popupContent, { maxWidth: 280, className: 'custom-popup' });
-                marker.setOpacity(0);
-                setTimeout(function() { marker.setOpacity(1); }, index * 100);
-                pathCoordinates.push([loc.latitude, loc.longitude]);
-            }
-            // Animals without GPS are NOT shown on map — they appear when ESP32 sends data
+            marker.bindPopup(popupContent);
+            markers[loc.id] = marker;
+
+            // Add to table
+            const tableBody = document.getElementById('animal-table-body');
+            const row = document.createElement('tr');
+
+            row.innerHTML = 
+                '<td><strong>' + loc.nickname + '</strong><br><small class="text-muted">' + loc.id + '</small></td>' +
+                '<td>' + loc.species + '</td>' +
+                '<td>' +
+                    '<span class="badge bg-' + (isFallback ? 'warning text-dark' : 'success') + '">' +
+                        (isFallback ? '<i class="bi bi-building"></i> Campus' : '<i class="bi bi-satellite"></i> GPS') +
+                    '</span>' +
+                '</td>' +
+                '<td><code>' + loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) + '</code></td>' +
+                '<td>' + loc.timestamp + '</td>' +
+                '<td>' + loc.speed + ' km/h</td>' +
+                '<td>' +
+                    (isStationary 
+                        ? '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Alert</span>' 
+                        : '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Normal</span>'
+                    ) +
+                '</td>';
+
+            // Click row to zoom to marker
+            row.addEventListener('click', function() {
+                map.setView([loc.latitude, loc.longitude], 18);
+                markers[loc.id].openPopup();
+            });
+
+            tableBody.appendChild(row);
         });
 
-        document.getElementById('stat-with-location').textContent = withLocationCount;
-
-        if (pathCoordinates.length > 1) {
-            L.polyline(pathCoordinates, {
-                color: '#667eea', weight: 4, opacity: 0.8,
-                dashArray: '12, 8', lineCap: 'round', lineJoin: 'round'
-            }).addTo(pathsLayer);
-        }
-
-        if (pathCoordinates.length > 0) {
-            map.fitBounds(pathCoordinates, { padding: [50, 50], maxZoom: 15 });
-        }
-    }
-
-    renderMarkers();
-
-    // ─── Render Geofences ───
-    function renderGeofences() {
-        fencesLayer.clearLayers();
+        // Add geofences
         {% for fence in geofences %}
         (function() {
-            var circle = L.circle([{{ fence.center_latitude }}, {{ fence.center_longitude }}], {
-                color: '{% if "Demo" in fence.name %}#ed8936{% else %}#ff6b6b{% endif %}',
-                fillColor: '{% if "Demo" in fence.name %}rgba(237, 137, 54, 0.15){% else %}rgba(255, 107, 107, 0.15){% endif %}',
-                fillOpacity: 0.3,
+            const fenceType = '{{ fence.fence_type|default:"inclusion" }}';
+            const fenceColor = fenceType === 'exclusion' ? '#dc3545' : '#0dcaf0';
+            const fenceFill = fenceType === 'exclusion' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(13, 202, 240, 0.1)';
+            
+            L.circle([{{ fence.center_latitude }}, {{ fence.center_longitude }}], {
+                color: fenceColor,
+                fillColor: fenceFill,
+                fillOpacity: 0.2,
                 radius: {{ fence.radius_meters }},
                 weight: 2,
-                dashArray: '8, 4'
-            }).addTo(fencesLayer);
-
-            var fenceName = '{{ fence.name|escapejs }}';
-            var isDemo = fenceName.indexOf('Demo') !== -1;
-            var popupHtml = '<div style="font-weight:600;color:' + (isDemo ? '#ed8936' : '#ff6b6b') + ';">';
-            popupHtml += '<i class="fas fa-shield-alt me-1"></i>' + fenceName + '</div>';
-            popupHtml += '<div style="font-size:12px;color:#718096;margin-top:4px;">Radius: {{ fence.radius_meters }}m</div>';
-            if (isDemo) {
-                popupHtml += '<div style="font-size:11px;color:#ed8936;margin-top:4px;"><i class="fas fa-flask me-1"></i>Demo geofence for presentation</div>';
-            }
-            circle.bindPopup(popupHtml, { maxWidth: 200 });
+                dashArray: '8, 6'
+            }).addTo(map).bindPopup(
+                '<div class="animal-popup">' +
+                    '<h6><i class="bi bi-hexagon me-1"></i> {{ fence.name|escapejs }}</h6>' +
+                    '<p>Type: <span class="badge bg-' + (fenceType === 'exclusion' ? 'danger' : 'info') + '">' + fenceType.charAt(0).toUpperCase() + fenceType.slice(1) + '</span></p>' +
+                    '<p>Radius: {{ fence.radius_meters }}m</p>' +
+                '</div>'
+            );
         })();
+        {% empty %}
+        console.log('No geofences configured');
         {% endfor %}
-    }
 
-    renderGeofences();
+        // If no animals, show fallback campus marker and message
+        if (locations.length === 0) {
+            const noDataRow = document.createElement('tr');
+            noDataRow.innerHTML = 
+                '<td colspan="7" class="text-center text-muted py-5">' +
+                    '<i class="bi bi-inbox display-4 d-block mb-3" style="color: rgba(255,255,255,0.2);"></i>' +
+                    '<h5 class="text-muted">No animals with location data</h5>' +
+                    '<p class="text-muted mb-0">Data will appear once your ESP32 board starts sending locations.<br>' +
+                    'Fallback location: IUIU Kibuli Campus (0.3006, 32.5916)</p>' +
+                '</td>';
+            document.getElementById('animal-table-body').appendChild(noDataRow);
 
-    // ─── Refresh Function ───
-    function refreshMap() {
-        var icon = document.getElementById('refresh-icon');
-        icon.classList.add('refresh-spin');
-        setTimeout(function() { location.reload(); }, 500);
-    }
-
-    // ─── Toast Notification ───
-    function showToast(message) {
-        var toast = document.getElementById('map-toast');
-        document.getElementById('toast-message').textContent = message;
-        toast.classList.add('show');
-        setTimeout(function() { toast.classList.remove('show'); }, 3000);
-    }
-
-    // ─── Auto Refresh ───
-    function toggleAutoRefresh() {
-        var btn = document.getElementById('auto-refresh-btn');
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
-            btn.innerHTML = '<i class="fas fa-bolt me-2"></i>Auto: OFF';
-            btn.classList.remove('btn-auto-on');
-            btn.classList.add('btn-auto-off');
-            showToast('Auto-refresh disabled');
-        } else {
-            autoRefreshInterval = setInterval(function() { location.reload(); }, 30000);
-            btn.innerHTML = '<i class="fas fa-bolt me-2"></i>Auto: ON';
-            btn.classList.remove('btn-auto-off');
-            btn.classList.add('btn-auto-on');
-            showToast('Auto-refresh enabled (30s)');
+            // Show campus marker
+            if (fallbackLoc) {
+                L.marker([fallbackLoc.lat, fallbackLoc.lon]).addTo(map)
+                    .bindPopup(
+                        '<div class="animal-popup">' +
+                            '<h6><i class="bi bi-building me-1"></i> IUIU Kibuli Campus</h6>' +
+                            '<p>Default fallback location</p>' +
+                            '<p><code>' + fallbackLoc.lat + ', ' + fallbackLoc.lon + '</code></p>' +
+                            '<p class="text-muted">Waiting for ESP32 data...</p>' +
+                        '</div>'
+                    ).openPopup();
+            }
+        } else if (locations.length > 1) {
+            // Fit bounds to show all markers
+            const group = new L.featureGroup(Object.values(markers));
+            map.fitBounds(group.getBounds().pad(0.15));
         }
-    }
 
-    // ─── Predict Next Location ───
-    function predictNextLocation(animalId) {
-        if (!animalId) { showToast('Prediction not available'); return; }
-        showToast('Calculating prediction...');
-        fetch('/api/predict/' + animalId + '/')
-            .then(r => r.json())
-            .then(data => {
-                if (data.predicted_latitude && data.predicted_longitude) {
-                    var predMarker = L.marker([data.predicted_latitude, data.predicted_longitude], {
-                        icon: predictedIcon, zIndexOffset: 2000
-                    }).addTo(markersLayer);
-                    predMarker.bindPopup('<div style="font-weight:600;color:#f5576c;"><i class="fas fa-magic me-2"></i>Predicted Next Location</div><div style="font-size:12px;color:#718096;margin-top:4px;">Lat: ' + data.predicted_latitude.toFixed(4) + '<br>Lng: ' + data.predicted_longitude.toFixed(4) + '</div>', { maxWidth: 220 });
-                    predMarker.openPopup();
-                    map.panTo([data.predicted_latitude, data.predicted_longitude]);
-                    showToast('Prediction displayed on map');
-                } else { showToast('No prediction data available'); }
-            })
-            .catch(err => { console.error(err); showToast('Prediction failed'); });
-    }
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+            console.log('Refreshing map data...');
+            window.location.reload();
+        }, 30000);
 
-    function updateTimeDisplay() {
-        var now = new Date();
-        document.getElementById('stat-updated').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    updateTimeDisplay();
+    })();
 </script>
 {% endblock %}

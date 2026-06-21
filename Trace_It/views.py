@@ -123,7 +123,7 @@ def check_health_alerts(tag, hr, spo2, temp, sensor_status):
 
     animal = deployment.animal
 
-    if sensor_status and sensor_status != 'OK':
+    if sensor_status and sensor_status != 'OK' and sensor_status != 'FALLBACK_GPS':
         Alert.objects.get_or_create(
             animal=animal,
             alert_type='SENSOR',
@@ -509,7 +509,7 @@ def dashboard(request):
         context['recent_logs'] = AuditLog.objects.all().order_by('-timestamp')[:20]
         context['low_battery_tags'] = TrackingTag.objects.filter(battery_level__lt=20).count()
         context['recent_biometrics'] = BiometricReading.objects.all().order_by('-timestamp')[:10]
-        context['sensor_errors'] = BiometricReading.objects.exclude(sensor_status='OK').count()
+        context['sensor_errors'] = BiometricReading.objects.exclude(sensor_status='OK').exclude(sensor_status='FALLBACK_GPS').count()
         context['critical_health_alerts'] = Alert.objects.filter(
             alert_type='HEALTH', 
             is_resolved=False,
@@ -901,7 +901,7 @@ def location_history(request, animal_id):
 @login_required
 @ranger_required
 def map_view(request):
-    """Show ALL animals on the map with proper counts — dynamic center based on actual GPS data."""
+    """Show ALL animals on the map — including fallback GPS locations."""
     try:
         animals = Animal.objects.all().select_related('species')
         locations_data = []
@@ -910,8 +910,8 @@ def map_view(request):
         for animal in animals:
             try:
                 loc = animal.get_latest_location()
-                # Exclude sentinel values (-999) which mean no GPS fix from ESP32
-                if loc and loc.latitude and loc.longitude and float(loc.latitude) != -999 and float(loc.longitude) != -999:
+                # Include fallback locations too (not just "real" GPS)
+                if loc and loc.latitude and loc.longitude:
                     animals_with_gps += 1
                     locations_data.append({
                         'id': animal.animal_id,
@@ -922,9 +922,8 @@ def map_view(request):
                         'speed': float(loc.speed) if loc.speed else 0,
                         'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
                         'stationary': animal.is_stationary_minutes(90),
+                        'is_fallback': abs(float(loc.latitude) - 0.3006) < 0.001 and abs(float(loc.longitude) - 32.5916) < 0.001,
                     })
-                # Animals without GPS or with sentinel values are NOT added to locations_data
-                # They won't appear on map until ESP32 sends valid GPS data
             except Exception as e:
                 logger.error(f"map_view error for animal {animal.animal_id}: {e}")
                 continue
@@ -939,6 +938,7 @@ def map_view(request):
             'demo_geofences': demo_geofences,
             'total_animals': animals.count(),
             'animals_with_gps': animals_with_gps,
+            'fallback_location': {'lat': 0.3006, 'lon': 32.5916, 'name': 'IUIU Kibuli Campus'},
         }
         return render(request, 'Trace_It/map_view.html', context)
     except Exception as e:
@@ -1314,28 +1314,33 @@ def iot_ingest(request):
     if not deployment:
         return JsonResponse({'status': 'error', 'message': 'Tag not assigned to any animal'}, status=400)
 
-    # Parse GPS coordinates - handle null/missing when no fix
+    # Parse GPS coordinates — ACCEPT fallback values too
     lat = parse_sentinel(data.get('latitude'))
     lon = parse_sentinel(data.get('longitude'))
     
-    location = None
-    if lat is not None and lon is not None:
-        # Only save location if we have valid GPS data
-        try:
-            location = Location.objects.create(
-                tag=tag,
-                latitude=float(lat),
-                longitude=float(lon),
-                altitude=parse_sentinel(data.get('altitude')),
-                speed=parse_sentinel(data.get('speed')),
-                temperature=parse_sentinel(data.get('temperature')),
-                timestamp=timezone.now(),
-            )
-        except Exception as e:
-            logger.error(f"Location save failed: {e}")
-            return JsonResponse({'status': 'error', 'message': f'Location save failed: {str(e)}'}, status=500)
+    # If no GPS at all, use IUIU Kibuli fallback
+    if lat is None or lon is None:
+        lat = 0.3006   # IUIU Kibuli
+        lon = 32.5916
+        is_fallback = True
     else:
-        logger.info(f"No GPS fix for tag {serial}, skipping location save")
+        is_fallback = False
+
+    # ALWAYS save location now (even fallback)
+    location = None
+    try:
+        location = Location.objects.create(
+            tag=tag,
+            latitude=float(lat),
+            longitude=float(lon),
+            altitude=parse_sentinel(data.get('altitude')),
+            speed=parse_sentinel(data.get('speed')),
+            temperature=parse_sentinel(data.get('temperature')),
+            timestamp=timezone.now(),
+        )
+    except Exception as e:
+        logger.error(f"Location save failed: {e}")
+        return JsonResponse({'status': 'error', 'message': f'Location save failed: {str(e)}'}, status=500)
 
     # Always process biometrics if available
     hr = parse_int_sentinel(data.get('heart_rate'))
@@ -1356,7 +1361,7 @@ def iot_ingest(request):
         except Exception as e:
             logger.error(f"Biometric save failed: {e}")
 
-    # Run checks regardless of location availability
+    # Run checks
     check_health_alerts(tag, hr, spo2, body_temp, sensor_status)
     if location:
         check_geofence_violations(deployment.animal, location)
@@ -1375,7 +1380,8 @@ def iot_ingest(request):
         'status': 'ok',
         'location_id': location.location_id if location else None,
         'animal_id': deployment.animal.animal_id,
-        'gps_fix': location is not None,
+        'gps_fix': not is_fallback,
+        'fallback_used': is_fallback,
     })
 
 
