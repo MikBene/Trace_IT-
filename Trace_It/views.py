@@ -952,6 +952,7 @@ def map_view(request):
             'animals_with_gps': 0,
         })
 
+
 @login_required
 @admin_required
 def export_locations_csv(request):
@@ -1313,24 +1314,30 @@ def iot_ingest(request):
     if not deployment:
         return JsonResponse({'status': 'error', 'message': 'Tag not assigned to any animal'}, status=400)
 
-    lat = data.get('latitude')
-    lon = data.get('longitude')
-    if lat is None or lon is None:
-        return JsonResponse({'status': 'error', 'message': 'Missing latitude/longitude'}, status=400)
+    # Parse GPS coordinates - handle null/missing when no fix
+    lat = parse_sentinel(data.get('latitude'))
+    lon = parse_sentinel(data.get('longitude'))
+    
+    location = None
+    if lat is not None and lon is not None:
+        # Only save location if we have valid GPS data
+        try:
+            location = Location.objects.create(
+                tag=tag,
+                latitude=float(lat),
+                longitude=float(lon),
+                altitude=parse_sentinel(data.get('altitude')),
+                speed=parse_sentinel(data.get('speed')),
+                temperature=parse_sentinel(data.get('temperature')),
+                timestamp=timezone.now(),
+            )
+        except Exception as e:
+            logger.error(f"Location save failed: {e}")
+            return JsonResponse({'status': 'error', 'message': f'Location save failed: {str(e)}'}, status=500)
+    else:
+        logger.info(f"No GPS fix for tag {serial}, skipping location save")
 
-    try:
-        location = Location.objects.create(
-            tag=tag,
-            latitude=float(lat),
-            longitude=float(lon),
-            altitude=parse_sentinel(data.get('altitude')),
-            speed=parse_sentinel(data.get('speed')),
-            temperature=parse_sentinel(data.get('temperature')),
-            timestamp=timezone.now(),
-        )
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': f'Location save failed: {str(e)}'}, status=500)
-
+    # Always process biometrics if available
     hr = parse_int_sentinel(data.get('heart_rate'))
     spo2 = parse_int_sentinel(data.get('spo2'))
     body_temp = parse_sentinel(data.get('body_temperature'))
@@ -1349,23 +1356,26 @@ def iot_ingest(request):
         except Exception as e:
             logger.error(f"Biometric save failed: {e}")
 
+    # Run checks regardless of location availability
     check_health_alerts(tag, hr, spo2, body_temp, sensor_status)
-    check_geofence_violations(deployment.animal, location)
+    if location:
+        check_geofence_violations(deployment.animal, location)
     check_stationary_alert(deployment.animal)
 
-    if tag.battery_level is not None:
-        new_batt = data.get('battery_level')
-        if new_batt is not None:
-            try:
-                tag.battery_level = int(float(new_batt))
-                tag.save(update_fields=['battery_level'])
-            except (ValueError, TypeError):
-                pass
+    # Update battery level
+    new_batt = data.get('battery_level')
+    if new_batt is not None:
+        try:
+            tag.battery_level = int(float(new_batt))
+            tag.save(update_fields=['battery_level'])
+        except (ValueError, TypeError):
+            pass
 
     return JsonResponse({
         'status': 'ok',
-        'location_id': location.location_id,
+        'location_id': location.location_id if location else None,
         'animal_id': deployment.animal.animal_id,
+        'gps_fix': location is not None,
     })
 
 
