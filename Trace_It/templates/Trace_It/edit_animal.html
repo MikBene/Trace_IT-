@@ -298,10 +298,10 @@
                         <button type="submit" class="btn-save">
                             <i class="bi bi-check-lg me-2"></i>Update Animal
                         </button>
-                        <a href="{% url 'animal_list' %}" class="btn-cancel">
-                            <i class="bi bi-x-lg me-2"></i>Cancel
-                        </a>
-                    </div>
+                        <a href="{% url 'animal_detail' animal.animal_id %}" class="btn-cancel">
+                          <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>  
+                    </div>s
                 </form>
 
                 <!-- Separate Delete Form -->
