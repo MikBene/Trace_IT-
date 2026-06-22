@@ -26,53 +26,6 @@
         background: #0a0e27;
     }
 
-    /* ===== MAP OVERLAY (Legend) ===== */
-    .map-overlay {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        z-index: 1000;
-        background: rgba(10, 14, 39, 0.95);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 12px;
-        padding: 15px;
-        min-width: 220px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-    .map-overlay h6 {
-        color: white;
-        margin-bottom: 14px;
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        font-weight: 700;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        padding-bottom: 8px;
-    }
-    .map-legend-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 10px;
-        font-size: 13px;
-        color: rgba(255,255,255,0.85);
-    }
-    .legend-dot {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        flex-shrink: 0;
-        box-shadow: 0 0 6px rgba(0,0,0,0.3);
-    }
-    .legend-dot.live { background: linear-gradient(135deg, #42e695, #3bb2b8); }
-    .legend-dot.fallback { background: linear-gradient(135deg, #ffc107, #ff9800); }
-    .legend-dot.no-location { background: linear-gradient(135deg, #9ca3af, #6b7280); }
-    .legend-dot.predicted { background: linear-gradient(135deg, #f093fb, #f5576c); }
-    .legend-dot.geofence { background: linear-gradient(135deg, #ff6b6b, #f03); }
-    .legend-dot.path { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 2px; height: 4px; width: 20px; }
-    .legend-dot.stationary { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); border-radius: 4px; height: 10px; width: 20px; }
-
     /* ===== FALLBACK NOTICE ===== */
     .fallback-notice {
         background: rgba(255,193,7,0.12);
@@ -383,6 +336,63 @@
         box-shadow: 0 12px 40px rgba(0,0,0,0.3);
     }
 
+    /* ===== MAP KEY (SIDEBAR VERSION) ===== */
+    .map-key-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        padding: 20px;
+    }
+    .map-key-card h6 {
+        color: white;
+        margin-bottom: 16px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 700;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 10px;
+    }
+    .map-key-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: rgba(255,255,255,0.85);
+        transition: transform 0.2s ease;
+    }
+    .map-key-item:hover { transform: translateX(4px); }
+    .key-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .key-dot.live { background: linear-gradient(135deg, #42e695, #3bb2b8); }
+    .key-dot.fallback { background: linear-gradient(135deg, #ffc107, #ff9800); }
+    .key-dot.no-location { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+    .key-dot.predicted { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .key-dot.geofence { background: linear-gradient(135deg, #ff6b6b, #f03); }
+    .key-dot.path { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 2px; height: 4px; width: 20px; }
+    .key-dot.stationary { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); border-radius: 4px; height: 10px; width: 20px; }
+    .key-info {
+        font-size: 11px;
+        color: rgba(255,255,255,0.4);
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .key-demo {
+        font-size: 11px;
+        color: #ffc107;
+        margin-top: 8px;
+    }
+
     /* ===== GEOFENCE TABLE ===== */
     .geofence-table {
         border-collapse: separate;
@@ -550,12 +560,6 @@
             height: 50vh;
             min-height: 350px;
         }
-        .map-overlay {
-            min-width: 160px;
-            padding: 10px;
-            top: 10px;
-            right: 10px;
-        }
         .stat-card-map .number { font-size: 24px; }
     }
 </style>
@@ -637,7 +641,7 @@
     </div>
 </div>
 
-<!-- Map Container with Legend -->
+<!-- Map Container (CLEAN — no overlay on map) -->
 <div class="row g-3 mb-4 fade-in-up delay-2">
     <div class="col-lg-9">
         <div class="map-wrapper">
@@ -649,56 +653,56 @@
                 </div>
                 {% endif %}
             </div>
-            <div class="map-overlay">
-                <h6><i class="bi bi-key me-1"></i>Map Key</h6>
-                <div class="map-legend-item">
-                    <div class="legend-dot live"></div>
-                    <span><strong>Live Location</strong> — Has GPS data</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-dot fallback"></div>
-                    <span><strong>Campus Fallback</strong> — Indoor mode</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-dot no-location"></div>
-                    <span><strong>Tagged, No GPS</strong> — Waiting for data</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-dot path"></div>
-                    <span><strong>Movement Path</strong> — Travel route</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-dot geofence"></div>
-                    <span><strong>Geofence</strong> — Alert boundary</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-dot stationary"></div>
-                    <span><strong>Stationary</strong> — 90+ min idle</span>
-                </div>
-                <hr style="margin: 12px 0; opacity: 0.2; border-color: rgba(255,255,255,0.2);">
-                <div class="map-legend-item" style="font-size: 11px; color: rgba(255,255,255,0.4);">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Animals appear immediately after tag attachment. GPS data updates when ESP32 sends location.
-                </div>
-                {% if demo_geofences %}
-                <hr style="margin: 12px 0; opacity: 0.2; border-color: rgba(255,255,255,0.2);">
-                <div class="map-legend-item" style="font-size: 11px; color: #ffc107;">
-                    <i class="bi bi-flask me-2"></i>
-                    <strong>Demo Mode:</strong> 10m geofences active. Walk 10+ meters to trigger breach alert.
-                </div>
-                {% endif %}
-            </div>
         </div>
     </div>
     <div class="col-lg-3">
         <!-- Animal List on Side -->
-        <div class="glass-card" style="max-height: 75vh; overflow-y: auto;">
+        <div class="glass-card mb-3" style="max-height: 45vh; overflow-y: auto;">
             <h6 class="fw-bold mb-3" style="color: white; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
                 <i class="bi bi-list me-2" style="color: #0dcaf0;"></i>Animals on Map
             </h6>
             <div id="animal-side-list">
                 <!-- Populated by JS -->
             </div>
+        </div>
+
+        <!-- Map Key — MOVED TO SIDEBAR BELOW ANIMALS -->
+        <div class="map-key-card">
+            <h6><i class="bi bi-key me-2"></i>Map Key</h6>
+            <div class="map-key-item">
+                <div class="key-dot live"></div>
+                <span><strong>Live Location</strong> — Has GPS data</span>
+            </div>
+            <div class="map-key-item">
+                <div class="key-dot fallback"></div>
+                <span><strong>Campus Fallback</strong> — Indoor mode</span>
+            </div>
+            <div class="map-key-item">
+                <div class="key-dot no-location"></div>
+                <span><strong>Tagged, No GPS</strong> — Waiting for data</span>
+            </div>
+            <div class="map-key-item">
+                <div class="key-dot path"></div>
+                <span><strong>Movement Path</strong> — Travel route</span>
+            </div>
+            <div class="map-key-item">
+                <div class="key-dot geofence"></div>
+                <span><strong>Geofence</strong> — Alert boundary</span>
+            </div>
+            <div class="map-key-item">
+                <div class="key-dot stationary"></div>
+                <span><strong>Stationary</strong> — 90+ min idle</span>
+            </div>
+            <div class="key-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Animals appear immediately after tag attachment. GPS data updates when ESP32 sends location.
+            </div>
+            {% if demo_geofences %}
+            <div class="key-demo">
+                <i class="bi bi-flask me-2"></i>
+                <strong>Demo Mode:</strong> 10m geofences active. Walk 10+ meters to trigger breach alert.
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -743,7 +747,7 @@
                                 <td><span class="badge" style="background: linear-gradient(135deg, #42e695, #3bb2b8); color: white; font-size: 11px; padding: 5px 10px;"><i class="bi bi-check me-1"></i>Active</span></td>
                                 {% if user.userprofile.is_admin %}
                                 <td>
-                                    <form method="post" action="{% url 'delete_geofence' fence.geofence_id %}" class="d-inline" onsubmit="return confirm('Delete geofence \'{{ fence.name|escapejs }}\'? This will update the map and dashboard counts immediately.');">
+                                    <form method="post" action="{% url 'delete_geofence' fence.geofence_id %}" class="d-inline" onsubmit="return confirm('Delete geofence '{{ fence.name|escapejs }}'? This will update the map and dashboard counts immediately.');">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-sm" style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a); color: white; border: none; border-radius: 6px; font-size: 12px;">
                                             <i class="bi bi-trash me-1"></i>Delete
@@ -779,11 +783,7 @@
         'use strict';
 
         // ─── Parse locations data from Django views.py ───
-        // views.py sends: locations_data = json.dumps(locations_data) — a JSON STRING
-        // We use JSON.parse to convert it to a JavaScript array of objects
         var locations = {{ locations_data|safe }};
-        
-        // Fallback location from views.py context
         var fallbackLoc = {{ fallback_location|default:"null"|safe }};
 
         // Show fallback notice if any animal uses fallback GPS coordinates
@@ -793,7 +793,6 @@
         }
 
         // ─── Initialize Map ───
-        // Center on first animal location, or fallback (IUIU Kibuli), or Uganda default
         var defaultCenter, defaultZoom;
         if (locations.length > 0 && locations[0].latitude && locations[0].longitude) {
             defaultCenter = [locations[0].latitude, locations[0].longitude];
@@ -802,7 +801,7 @@
             defaultCenter = [fallbackLoc.lat, fallbackLoc.lon];
             defaultZoom = 15;
         } else {
-            defaultCenter = [1.3733, 32.2903]; // Uganda center
+            defaultCenter = [1.3733, 32.2903];
             defaultZoom = 6;
         }
 
@@ -949,7 +948,7 @@
                         popupContent += '<div class="mt-2"><span class="stationary-badge"><i class="bi bi-exclamation-triangle me-1"></i>Stationary 90+ MIN</span></div>';
                     }
 
-                    popupContent += '<div class="mt-3"><button class="btn btn-sm btn-success w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation(\'' + (loc.id || '') + '\')"><i class="bi bi-magic me-1"></i>Predict Next Location</button></div>';
+                    popupContent += '<div class="mt-3"><button class="btn btn-sm btn-success w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation('' + (loc.id || '') + '')"><i class="bi bi-magic me-1"></i>Predict Next Location</button></div>';
                     popupContent += '<div class="mt-2"><a href="/animal/' + (loc.id || '') + '/" class="btn btn-sm btn-success w-100"><i class="bi bi-eye me-1"></i>View Details</a></div>';
                     popupContent += '</div>';
 
@@ -987,7 +986,7 @@
                     // No location data yet — show at fallback position with grey marker
                     var noLocLat = fallbackLoc ? fallbackLoc.lat : 0.3006;
                     var noLocLon = fallbackLoc ? fallbackLoc.lon : 32.5916;
-                    
+
                     var marker = L.marker([noLocLat, noLocLon], {
                         icon: noLocationIcon,
                         zIndexOffset: 500
