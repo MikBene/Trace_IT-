@@ -521,6 +521,29 @@
     .custom-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
     .custom-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #0dcaf0, #198754); border-radius: 3px; }
 
+    /* ===== NO DATA OVERLAY ===== */
+    .no-data-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(10, 14, 39, 0.95);
+        padding: 30px 40px;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+        z-index: 1000;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .no-data-overlay h5 {
+        color: white;
+        margin-bottom: 8px;
+    }
+    .no-data-overlay p {
+        color: rgba(255,255,255,0.5);
+        font-size: 14px;
+        margin: 0;
+    }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 768px) {
         .map-wrapper {
@@ -618,7 +641,14 @@
 <div class="row g-3 mb-4 fade-in-up delay-2">
     <div class="col-lg-9">
         <div class="map-wrapper">
-            <div id="map"></div>
+            <div id="map">
+                {% if animals_with_gps == 0 %}
+                <div class="no-data-overlay">
+                    <h5><i class="bi bi-satellite me-2" style="color: #0dcaf0;"></i>No GPS Data Yet</h5>
+                    <p>Waiting for ESP32 to send first location fix.<br>Map will auto-center on Uganda when data arrives.</p>
+                </div>
+                {% endif %}
+            </div>
             <div class="map-overlay">
                 <h6><i class="bi bi-key me-1"></i>Map Key</h6>
                 <div class="map-legend-item">
@@ -694,6 +724,9 @@
                                 <th><i class="bi bi-geo-alt me-2"></i>Center</th>
                                 <th><i class="bi bi-rulers me-2"></i>Radius</th>
                                 <th><i class="bi bi-broadcast me-2"></i>Status</th>
+                                {% if user.userprofile.is_admin %}
+                                <th><i class="bi bi-cog me-2"></i>Action</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -708,6 +741,16 @@
                                 <td><code style="background: rgba(13,202,240,0.1); padding: 4px 8px; border-radius: 6px; color: #0dcaf0; font-size: 12px;">{{ fence.center_latitude }}, {{ fence.center_longitude }}</code></td>
                                 <td><span class="badge" style="background: rgba(13,202,240,0.15); color: #0dcaf0; font-weight: 600;">{{ fence.radius_meters }} m</span></td>
                                 <td><span class="badge" style="background: linear-gradient(135deg, #42e695, #3bb2b8); color: white; font-size: 11px; padding: 5px 10px;"><i class="bi bi-check me-1"></i>Active</span></td>
+                                {% if user.userprofile.is_admin %}
+                                <td>
+                                    <form method="post" action="{% url 'delete_geofence' fence.geofence_id %}" class="d-inline" onsubmit="return confirm('Delete geofence \'{{ fence.name|escapejs }}\'? This will update the map and dashboard counts immediately.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm" style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a); color: white; border: none; border-radius: 6px; font-size: 12px;">
+                                            <i class="bi bi-trash me-1"></i>Delete
+                                        </button>
+                                    </form>
+                                </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -735,22 +778,33 @@
     (function() {
         'use strict';
 
-        // Parse locations data from Django
-        var locations = JSON.parse('{{ locations_data|safe|default:"[]" }}');
-        var fallbackLoc = JSON.parse('{{ fallback_location|default:"null"|safe }}');
+        // ─── Parse locations data from Django views.py ───
+        // views.py sends: locations_data = json.dumps(locations_data) — a JSON STRING
+        // We use JSON.parse to convert it to a JavaScript array of objects
+        var locations = {{ locations_data|safe }};
+        
+        // Fallback location from views.py context
+        var fallbackLoc = {{ fallback_location|default:"null"|safe }};
 
-        // Show fallback notice if any animal uses fallback
+        // Show fallback notice if any animal uses fallback GPS coordinates
         var hasFallback = locations.some(function(loc) { return loc.is_fallback; });
         if (hasFallback) {
             document.getElementById('fallback-banner').style.display = 'flex';
         }
 
         // ─── Initialize Map ───
-        // Center on IUIU Kibuli or first animal
-        var defaultCenter = (locations.length > 0)
-            ? [locations[0].latitude, locations[0].longitude]
-            : (fallbackLoc ? [fallbackLoc.lat, fallbackLoc.lon] : [0.3006, 32.5916]);
-        var defaultZoom = locations.length > 0 ? 16 : 15;
+        // Center on first animal location, or fallback (IUIU Kibuli), or Uganda default
+        var defaultCenter, defaultZoom;
+        if (locations.length > 0 && locations[0].latitude && locations[0].longitude) {
+            defaultCenter = [locations[0].latitude, locations[0].longitude];
+            defaultZoom = 16;
+        } else if (fallbackLoc) {
+            defaultCenter = [fallbackLoc.lat, fallbackLoc.lon];
+            defaultZoom = 15;
+        } else {
+            defaultCenter = [1.3733, 32.2903]; // Uganda center
+            defaultZoom = 6;
+        }
 
         var map = L.map('map', { zoomControl: false }).setView(defaultCenter, defaultZoom);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -895,8 +949,8 @@
                         popupContent += '<div class="mt-2"><span class="stationary-badge"><i class="bi bi-exclamation-triangle me-1"></i>Stationary 90+ MIN</span></div>';
                     }
 
-                    popupContent += '<div class="mt-3"><button class="btn btn-sm btn-success w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation(' + (loc.id ? "'" + loc.id + "'" : 0) + ')"><i class="bi bi-magic me-1"></i>Predict Next Location</button></div>';
-                    popupContent += '<div class="mt-2"><a href="/animal/' + loc.id + '/" class="btn btn-sm btn-success w-100"><i class="bi bi-eye me-1"></i>View Details</a></div>';
+                    popupContent += '<div class="mt-3"><button class="btn btn-sm btn-success w-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border: none; border-radius: 8px; font-size: 12px;" onclick="predictNextLocation(\'' + (loc.id || '') + '\')"><i class="bi bi-magic me-1"></i>Predict Next Location</button></div>';
+                    popupContent += '<div class="mt-2"><a href="/animal/' + (loc.id || '') + '/" class="btn btn-sm btn-success w-100"><i class="bi bi-eye me-1"></i>View Details</a></div>';
                     popupContent += '</div>';
 
                     marker.bindPopup(popupContent, { maxWidth: 280, className: 'custom-popup' });
@@ -930,8 +984,11 @@
                     sideList.appendChild(listItem);
 
                 } else {
-                    // No location data yet
-                    var marker = L.marker([0.3006, 32.5916], {
+                    // No location data yet — show at fallback position with grey marker
+                    var noLocLat = fallbackLoc ? fallbackLoc.lat : 0.3006;
+                    var noLocLon = fallbackLoc ? fallbackLoc.lon : 32.5916;
+                    
+                    var marker = L.marker([noLocLat, noLocLon], {
                         icon: noLocationIcon,
                         zIndexOffset: 500
                     }).addTo(markersLayer);
@@ -1078,7 +1135,7 @@
         }
         updateTimeDisplay();
 
-        // If no animals, show fallback campus marker
+        // If no animals with GPS, show fallback campus marker
         if (locations.length === 0 && fallbackLoc) {
             L.marker([fallbackLoc.lat, fallbackLoc.lon]).addTo(map)
                 .bindPopup(
