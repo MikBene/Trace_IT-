@@ -1317,15 +1317,18 @@ def iot_ingest(request):
     # Parse GPS coordinates — ACCEPT fallback values too
     lat = parse_sentinel(data.get('latitude'))
     lon = parse_sentinel(data.get('longitude'))
+    sensor_status = data.get('sensor_status', 'OK')
     
-    # If no GPS at all, use IUIUKC fallback
+    # Determine if fallback was used: either coordinates are missing,
+    # or the ESP32 explicitly reports FALLBACK_GPS status
     if lat is None or lon is None:
         lat = 0.3163   # IUIUKC
         lon = 32.5822
         is_fallback = True
+    elif sensor_status == 'FALLBACK_GPS':
+        is_fallback = True
     else:
         is_fallback = False
-
     # ALWAYS save location now (even fallback)
     location = None
     try:
@@ -1346,7 +1349,6 @@ def iot_ingest(request):
     hr = parse_int_sentinel(data.get('heart_rate'))
     spo2 = parse_int_sentinel(data.get('spo2'))
     body_temp = parse_sentinel(data.get('body_temperature'))
-    sensor_status = data.get('sensor_status', 'OK')
 
     if hr is not None or spo2 is not None or body_temp is not None:
         try:
