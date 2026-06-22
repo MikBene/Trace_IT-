@@ -585,7 +585,7 @@
     <i class="bi bi-info-circle-fill"></i>
     <div>
         <strong>Indoor / Campus Mode Active</strong>
-        Some animals show approximate IUIU Kibuli Campus location when GPS signal is unavailable indoors.
+        Some animals show approximate IUIUKC location when GPS signal is unavailable indoors.
     </div>
 </div>
 
@@ -984,8 +984,8 @@
 
                 } else {
                     // No location data yet — show at fallback position with grey marker
-                    var noLocLat = fallbackLoc ? fallbackLoc.lat : 0.3006;
-                    var noLocLon = fallbackLoc ? fallbackLoc.lon : 32.5916;
+                    var noLocLat = fallbackLoc ? fallbackLoc.lat : 0.3163;
+                    var noLocLon = fallbackLoc ? fallbackLoc.lon : 32.5822;
 
                     var marker = L.marker([noLocLat, noLocLon], {
                         icon: noLocationIcon,
@@ -1050,7 +1050,15 @@
                     popupHtml += '<div style="font-size:11px;color:#ed8936;margin-top:4px;"><i class="bi bi-flask me-1"></i>Demo geofence for presentation</div>';
                 }
                 circle.bindPopup(popupHtml, { maxWidth: 200 });
-            })();
+        
+    // Expose functions to global scope for onclick handlers
+    window.toggleSatellite = toggleSatellite;
+    window.refreshMap = refreshMap;
+    window.toggleAutoRefresh = toggleAutoRefresh;
+    window.showToast = showToast;
+    window.predictNextLocation = predictNextLocation;
+
+    })();
             {% empty %}
             console.log('No geofences configured');
             {% endfor %}
@@ -1139,13 +1147,21 @@
             L.marker([fallbackLoc.lat, fallbackLoc.lon]).addTo(map)
                 .bindPopup(
                     '<div class="animal-popup">' +
-                        '<h5 style="color: #ffc107;"><i class="bi bi-building me-1"></i>IUIU Kibuli Campus</h5>' +
+                        '<h5 style="color: #ffc107;"><i class="bi bi-building me-1"></i>IUIUKC</h5>' +
                         '<p>Default fallback location</p>' +
                         '<p><code>' + fallbackLoc.lat + ', ' + fallbackLoc.lon + '</code></p>' +
                         '<p class="text-muted">Waiting for ESP32 data...</p>' +
                     '</div>'
                 ).openPopup();
         }
+
+
+    // Expose functions to global scope for onclick handlers
+    window.toggleSatellite = toggleSatellite;
+    window.refreshMap = refreshMap;
+    window.toggleAutoRefresh = toggleAutoRefresh;
+    window.showToast = showToast;
+    window.predictNextLocation = predictNextLocation;
 
     })();
 </script>

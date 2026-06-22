@@ -922,7 +922,7 @@ def map_view(request):
                         'speed': float(loc.speed) if loc.speed else 0,
                         'timestamp': loc.timestamp.strftime('%Y-%m-%d %H:%M:%S') if loc.timestamp else 'N/A',
                         'stationary': animal.is_stationary_minutes(90),
-                        'is_fallback': abs(float(loc.latitude) - 0.3006) < 0.001 and abs(float(loc.longitude) - 32.5916) < 0.001,
+                        'is_fallback': abs(float(loc.latitude) - 0.3163) < 0.001 and abs(float(loc.longitude) - 32.5822) < 0.001,
                     })
             except Exception as e:
                 logger.error(f"map_view error for animal {animal.animal_id}: {e}")
@@ -938,7 +938,7 @@ def map_view(request):
             'demo_geofences': demo_geofences,
             'total_animals': animals.count(),
             'animals_with_gps': animals_with_gps,
-            'fallback_location': {'lat': 0.3006, 'lon': 32.5916, 'name': 'IUIU Kibuli Campus'},
+            'fallback_location': {'lat': 0.3163, 'lon': 32.5822, 'name': 'IUIUKC'},
         }
         return render(request, 'Trace_It/map_view.html', context)
     except Exception as e:
@@ -1318,10 +1318,10 @@ def iot_ingest(request):
     lat = parse_sentinel(data.get('latitude'))
     lon = parse_sentinel(data.get('longitude'))
     
-    # If no GPS at all, use IUIU Kibuli fallback
+    # If no GPS at all, use IUIUKC fallback
     if lat is None or lon is None:
-        lat = 0.3006   # IUIU Kibuli
-        lon = 32.5916
+        lat = 0.3163   # IUIUKC
+        lon = 32.5822
         is_fallback = True
     else:
         is_fallback = False
